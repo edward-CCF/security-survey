@@ -1,0 +1,605 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CCF Food Security Survey / Encuesta de seguridad alimentaria</title>
+<style>
+  :root {
+    --ink: #1c2b2d;
+    --muted: #55686b;
+    --paper: #ffffff;
+    --ground: #eef3f2;
+    --line: #c5d3d1;
+    --green: #1f6b4e;
+    --green-dark: #154c37;
+    --sun: #f0b429;
+    --error: #b3261e;
+    --radius: 14px;
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font: 18px/1.5 "Avenir Next", "Segoe UI", Roboto, system-ui, sans-serif;
+  }
+  main { max-width: 760px; margin: 0 auto; padding: 20px 16px 56px; }
+  .org { margin: 8px 0 24px; font-weight: 600; color: var(--green-dark); }
+  h1 { font-size: clamp(1.7rem, 5vw, 2.3rem); line-height: 1.15; margin: 0 0 12px; letter-spacing: -0.01em; }
+  p { margin: 0 0 16px; }
+  .hidden { display: none !important; }
+
+  /* Language chooser: the first thing people see */
+  .lang-grid { display: grid; gap: 16px; margin-top: 28px; }
+  @media (min-width: 600px) { .lang-grid { grid-template-columns: 1fr 1fr; } }
+  .lang-btn {
+    min-height: 150px;
+    border: 0;
+    border-radius: 20px;
+    background: var(--green);
+    color: #fff;
+    font: inherit;
+    font-size: clamp(2rem, 7vw, 2.8rem);
+    font-weight: 700;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 6px 0 var(--green-dark);
+    transition: transform .08s, box-shadow .08s;
+  }
+  .lang-btn:active { transform: translateY(4px); box-shadow: 0 2px 0 var(--green-dark); }
+  .lang-btn.alt { background: var(--sun); color: var(--ink); box-shadow: 0 6px 0 #b98712; }
+  .lang-btn.alt:active { box-shadow: 0 2px 0 #b98712; }
+
+  /* Survey */
+  .topbar { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
+  .switch { display: inline-flex; border: 2px solid var(--green); border-radius: 999px; overflow: hidden; }
+  .switch button {
+    border: 0; background: transparent; color: var(--green-dark);
+    font: inherit; font-size: .9rem; font-weight: 600; padding: 6px 16px; cursor: pointer; min-height: 40px;
+  }
+  .switch button[aria-pressed="true"] { background: var(--green); color: #fff; }
+  .intro { color: var(--muted); }
+
+  fieldset {
+    margin: 0 0 20px; padding: 18px 18px 20px;
+    background: var(--paper); border: 2px solid var(--line); border-radius: var(--radius);
+  }
+  fieldset.error { border-color: var(--error); }
+  legend { float: left; width: 100%; padding: 0; margin: 0 0 12px; font-weight: 700; font-size: 1.05rem; }
+  legend + * { clear: both; }
+  .opts { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(84px, 1fr)); margin-top: 6px; }
+  .opts.wide { grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); }
+  .opt { position: relative; display: block; }
+  .opt input { position: absolute; opacity: 0; inset: 0; width: 100%; height: 100%; margin: 0; cursor: pointer; }
+  .opt span {
+    display: flex; align-items: center; justify-content: center; text-align: center;
+    min-height: 58px; padding: 8px 10px;
+    border: 2px solid var(--line); border-radius: 12px; background: #fff;
+    font-weight: 600; transition: background .1s, border-color .1s;
+  }
+  .opt input:checked + span { background: var(--green); border-color: var(--green); color: #fff; }
+  .opt input:focus-visible + span { outline: 4px solid var(--sun); outline-offset: 2px; }
+  .opt:hover input:not(:checked) + span { border-color: var(--green); }
+  .msg { color: var(--error); font-weight: 600; margin: 10px 0 0; }
+  textarea {
+    width: 100%; min-height: 90px; padding: 12px; font: inherit; color: inherit;
+    border: 2px solid var(--line); border-radius: 12px; resize: vertical;
+  }
+  textarea:focus-visible { outline: 4px solid var(--sun); outline-offset: 2px; border-color: var(--green); }
+
+  .btn {
+    border: 0; border-radius: 12px; background: var(--green); color: #fff;
+    font: inherit; font-weight: 700; padding: 14px 28px; min-height: 56px; cursor: pointer;
+  }
+  .btn:hover { background: var(--green-dark); }
+  .btn:focus-visible { outline: 4px solid var(--sun); outline-offset: 2px; }
+  .btn.secondary { background: #fff; color: var(--green-dark); border: 2px solid var(--green); }
+  .btn.danger { background: #fff; color: var(--error); border: 2px solid var(--error); }
+  .btn.small { min-height: 44px; padding: 8px 18px; font-size: .95rem; }
+  #formError { color: var(--error); font-weight: 700; margin: 0 0 14px; }
+
+  .thanks { text-align: center; padding: 56px 0; }
+  .thanks h1 { font-size: clamp(2.2rem, 8vw, 3.2rem); }
+
+  /* Staff export panel */
+  .panel { background: var(--paper); border: 2px solid var(--line); border-radius: var(--radius); padding: 20px; margin-bottom: 18px; }
+  .panel h2 { margin: 0 0 6px; font-size: 1.15rem; }
+  .panel p { color: var(--muted); font-size: .95rem; }
+  .row { display: flex; gap: 10px; flex-wrap: wrap; }
+  .stat { font-size: 2.4rem; font-weight: 700; line-height: 1; }
+  .ok { color: var(--green-dark); font-weight: 600; min-height: 1.5em; }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+<main>
+  <noscript><p>This survey needs JavaScript. / Esta encuesta necesita JavaScript.</p></noscript>
+
+  <!-- 1. Language selection -->
+  <section id="screenLang" class="hidden">
+    <p class="org">Creighton Community Foundation</p>
+    <h1>Choose your language<br>Elija su idioma</h1>
+    <div class="lang-grid">
+      <button class="lang-btn" type="button" data-lang="en" lang="en">English</button>
+      <button class="lang-btn alt" type="button" data-lang="es" lang="es">Español</button>
+    </div>
+  </section>
+
+  <!-- 2. Survey -->
+  <section id="screenSurvey" class="hidden">
+    <div class="topbar">
+      <p class="org" style="margin:8px 0 16px">Creighton Community Foundation</p>
+      <div class="switch" role="group" aria-label="Language / Idioma">
+        <button type="button" data-switch="en" lang="en">English</button>
+        <button type="button" data-switch="es" lang="es">Español</button>
+      </div>
+    </div>
+    <h1 id="surveyTitle"></h1>
+    <p class="intro" id="surveyIntro"></p>
+    <form id="form" novalidate></form>
+    <p id="formError" role="alert" class="hidden"></p>
+    <button class="btn" id="submitBtn" type="button"></button>
+  </section>
+
+  <!-- 3. Thank you -->
+  <section id="screenThanks" class="hidden thanks" aria-live="polite">
+    <h1 id="thanksTitle"></h1>
+    <p id="thanksText"></p>
+    <button class="btn secondary" id="nextBtn" type="button"></button>
+  </section>
+
+  <!-- Staff-only export panel: open index.html?admin=1 -->
+  <section id="screenAdmin" class="hidden">
+    <p class="org">Staff export</p>
+    <h1>Survey responses</h1>
+    <div class="panel">
+      <div class="stat" id="adminCount">0</div>
+      <p id="adminSub">responses saved on this device</p>
+    </div>
+    <div class="panel">
+      <h2>Import into Google Sheets</h2>
+      <p><strong>One row per household:</strong> best for a new tab. In Sheets use <em>File &gt; Import &gt; Upload</em>, or click “Copy for Sheets” and paste into cell A1.</p>
+      <div class="row">
+        <button class="btn" id="dlRows" type="button">Download CSV (one row per household)</button>
+        <button class="btn secondary" id="copyRows" type="button">Copy for Sheets</button>
+      </div>
+      <p style="margin-top:18px"><strong>Same layout as “Food Security Survey Findings”:</strong> one column per household, with question labels in column A.</p>
+      <div class="row">
+        <button class="btn secondary" id="dlCols" type="button">Download CSV (Results-sheet layout)</button>
+      </div>
+      <p class="ok" id="adminMsg" role="status"></p>
+    </div>
+    <div class="panel">
+      <h2>Clear this device</h2>
+      <p>Only do this after you have exported and checked your data in Google Sheets.</p>
+      <button class="btn danger small" id="clearAll" type="button">Delete all saved responses</button>
+    </div>
+    <p><a href="./">Back to survey</a></p>
+  </section>
+</main>
+
+<script>
+/* ============================================================
+   SETTINGS
+   ============================================================ */
+const CONFIG = {
+  // Written to the "Channel" row/column. Override per device with ?channel=Drive-through
+  CHANNEL: 'Walk-up',
+
+  // The Results sheet has a "How did you first learn…" row, but the printed survey does not.
+  // Set to false to hide the question (the column is still exported, left blank).
+  SHOW_HOW_LEARNED: true,
+
+  // Optional: send each response straight to a Google Sheet (see the Apps Script below).
+  // Leave '' to only save on the device and export a CSV from ?admin=1.
+  SHEET_ENDPOINT: '',
+
+  // Seconds before the thank-you screen returns to language selection.
+  RETURN_SECONDS: 8,
+
+  STORAGE_KEY: 'ccf_food_security_responses_v1'
+};
+
+/* Optional Google Apps Script for SHEET_ENDPOINT
+   (Sheet > Extensions > Apps Script > paste > Deploy > Web app, access: Anyone):
+
+   function doPost(e) {
+     var d = JSON.parse(e.postData.contents);
+     var ss = SpreadsheetApp.getActiveSpreadsheet();
+     var sh = ss.getSheetByName('Responses') || ss.insertSheet('Responses');
+     if (sh.getLastRow() === 0) sh.appendRow(d.header);
+     sh.appendRow(d.row);
+     return ContentService.createTextOutput('ok');
+   }
+*/
+
+/* ============================================================
+   QUESTIONS
+   "values" are the canonical English answers written to the sheet,
+   whichever language the respondent used (matches the Results sheet).
+   ============================================================ */
+const IMPACT_EN = ['Not at all', 'A little', 'A moderate amount', 'A lot', 'A great deal'];
+const VISITS_EN = ['0', '1 or 2', '3 or 4', '5 or 6', '7 or 8', '9 or 10', '11 or 12', 'more than 12'];
+
+const QUESTIONS = [
+  {
+    id: 'household', wide: false,
+    text: { en: 'How many people are in your household?', es: '¿Cuántas personas viven en su hogar?' },
+    values: ['1', '2', '3', '4', '5', '6', '7', '8 or more'],
+    labels: {
+      en: ['1', '2', '3', '4', '5', '6', '7', '8 or more'],
+      es: ['1', '2', '3', '4', '5', '6', '7', '8 o más']
+    }
+  },
+  {
+    id: 'under5', wide: false,
+    text: { en: 'How many people under five years of age are in your household?', es: '¿Cuántas personas menores de cinco años viven en su hogar?' },
+    values: ['0', '1', '2', '3', '4', '5 or more'],
+    labels: {
+      en: ['0', '1', '2', '3', '4', '5 or more'],
+      es: ['0', '1', '2', '3', '4', '5 o más']
+    }
+  },
+  {
+    id: 'visits', wide: false,
+    text: {
+      en: "How many times has your household received food at CCF's Feeding Phoenix food distributions in the past 3 months?",
+      es: '¿Cuántas veces ha recibido su hogar alimentos en las distribuciones de alimentos de Feeding Phoenix de CCF durante los últimos 3 meses?'
+    },
+    values: VISITS_EN,
+    labels: {
+      en: VISITS_EN,
+      es: ['0', '1 o 2', '3 o 4', '5 o 6', '7 o 8', '9 o 10', '11 o 12', 'más de 12']
+    }
+  },
+  {
+    id: 'impact', wide: true,
+    text: {
+      en: "The USDA defines food security as having consistent access to enough food. How much do CCF's Feeding Phoenix food distributions increase your household's food security?",
+      es: 'El Departamento de Agricultura de los Estados Unidos (USDA) define la seguridad alimentaria como tener acceso constante a suficientes alimentos. ¿En qué medida las distribuciones de alimentos de Feeding Phoenix de CCF aumentan la seguridad alimentaria de su hogar?'
+    },
+    values: IMPACT_EN,
+    labels: {
+      en: IMPACT_EN,
+      es: ['Nada', 'Un poco', 'Moderadamente', 'Mucho', 'En gran medida']
+    }
+  },
+  {
+    id: 'learned', optional: true, kind: 'text',
+    text: {
+      en: 'How did you first learn of our Feeding Phoenix food distribution?',
+      es: '¿Cómo se enteró por primera vez de nuestra distribución de alimentos de Feeding Phoenix?'
+    }
+  }
+];
+
+const UI = {
+  en: {
+    title: 'Food Security Survey',
+    intro: 'This information will be used to shape Creighton Community Foundation (CCF) and inform our supporters. (please select one response per question)',
+    submit: 'Submit',
+    optional: '(optional)',
+    pick: 'Please select one answer.',
+    formError: 'Please answer the questions marked in red.',
+    thanksTitle: 'Thank you!',
+    thanksText: 'Your answers help CCF and our supporters.',
+    next: 'Start a new survey'
+  },
+  es: {
+    title: 'Encuesta de seguridad alimentaria',
+    intro: 'Esta información se utilizará para ayudar a dar forma a la Fundación Comunitaria Creighton (CCF) e informar a nuestros colaboradores. (por favor, seleccione una respuesta por pregunta)',
+    submit: 'Enviar',
+    optional: '(opcional)',
+    pick: 'Seleccione una respuesta.',
+    formError: 'Por favor responda las preguntas marcadas en rojo.',
+    thanksTitle: '¡Gracias!',
+    thanksText: 'Sus respuestas ayudan a CCF y a nuestros colaboradores.',
+    next: 'Comenzar una nueva encuesta'
+  }
+};
+
+/* Column order mirrors the Results sheet (rows 1–7). "under5" is appended last so
+   existing row references in the sheet (e.g. rows 4 and 5) don't shift. */
+const COLUMN_HEADERS = [
+  'Date',
+  'Channel',
+  QUESTIONS[0].text.en,
+  QUESTIONS[2].text.en,
+  QUESTIONS[3].text.en,
+  QUESTIONS[4].text.en,
+  'English or Spanish',
+  QUESTIONS[1].text.en
+];
+
+/* ============================================================
+   STORAGE (falls back to memory if the browser blocks localStorage)
+   ============================================================ */
+let memoryStore = [];
+function loadAll() {
+  try {
+    const raw = localStorage.getItem(CONFIG.STORAGE_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch (e) { return memoryStore; }
+}
+function saveAll(list) {
+  memoryStore = list;
+  try { localStorage.setItem(CONFIG.STORAGE_KEY, JSON.stringify(list)); } catch (e) { /* memory only */ }
+}
+
+/* ============================================================
+   HELPERS
+   ============================================================ */
+const $ = (s) => document.querySelector(s);
+const params = new URLSearchParams(location.search);
+const channel = params.get('channel') || CONFIG.CHANNEL;
+
+function todayString() {
+  const d = new Date();
+  return (d.getMonth() + 1) + '/' + d.getDate() + '/' + d.getFullYear();
+}
+function guard(v) {               // stop Google Sheets from running typed text as a formula
+  const s = String(v == null ? '' : v);
+  return /^[=+\-@\t\r]/.test(s) ? ' ' + s : s;
+}
+function csvCell(v) {
+  const s = guard(v);
+  return /[",\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+}
+function toCsv(table) { return table.map(r => r.map(csvCell).join(',')).join('\r\n'); }
+function toTsv(table) {
+  return table.map(r => r.map(v => guard(v).replace(/[\t\r\n]+/g, ' ')).join('\t')).join('\n');
+}
+function recordToRow(r) {
+  return [r.date, r.channel, r.household, r.visits, r.impact, r.learned, r.language, r.under5];
+}
+function rowsTable(list) { return [COLUMN_HEADERS].concat(list.map(recordToRow)); }
+function colsTable(list) {
+  // One column per household; labels in A, blank B, answers from C (same as the Results sheet)
+  return COLUMN_HEADERS.map((h, i) =>
+    [i < 2 ? '' : h, ''].concat(list.map(r => recordToRow(r)[i])));
+}
+
+/* ============================================================
+   SURVEY FLOW
+   ============================================================ */
+const screens = ['Lang', 'Survey', 'Thanks', 'Admin'];
+function show(name) {
+  screens.forEach(s => $('#screen' + s).classList.toggle('hidden', s !== name));
+  window.scrollTo(0, 0);
+}
+
+let lang = 'en';
+let answers = {};
+let returnTimer = null;
+
+function activeQuestions() {
+  return QUESTIONS.filter(q => q.id !== 'learned' || CONFIG.SHOW_HOW_LEARNED);
+}
+
+function startSurvey(l) {
+  answers = {};
+  setLang(l);
+  show('Survey');
+}
+
+function setLang(l) {
+  lang = l;
+  document.documentElement.lang = l;
+  const t = UI[l];
+  $('#surveyTitle').textContent = t.title;
+  $('#surveyIntro').textContent = t.intro;
+  $('#submitBtn').textContent = t.submit;
+  document.querySelectorAll('[data-switch]').forEach(b =>
+    b.setAttribute('aria-pressed', b.dataset.switch === l ? 'true' : 'false'));
+  renderForm();
+  hideError();
+}
+
+function renderForm() {
+  const form = $('#form');
+  form.innerHTML = '';
+  activeQuestions().forEach(q => {
+    const fs = document.createElement('fieldset');
+    fs.dataset.id = q.id;
+    const legend = document.createElement('legend');
+    legend.textContent = q.text[lang] + (q.optional ? ' ' + UI[lang].optional : '');
+    fs.appendChild(legend);
+
+    if (q.kind === 'text') {
+      const ta = document.createElement('textarea');
+      ta.name = q.id;
+      ta.maxLength = 300;
+      ta.setAttribute('aria-label', q.text[lang]);
+      ta.value = answers[q.id] || '';
+      ta.addEventListener('input', () => { answers[q.id] = ta.value; });
+      fs.appendChild(ta);
+    } else {
+      const wrap = document.createElement('div');
+      wrap.className = 'opts' + (q.wide ? ' wide' : '');
+      q.values.forEach((val, i) => {
+        const label = document.createElement('label');
+        label.className = 'opt';
+        const input = document.createElement('input');
+        input.type = 'radio';
+        input.name = q.id;
+        input.value = val;
+        input.checked = answers[q.id] === val;
+        input.addEventListener('change', () => {
+          answers[q.id] = val;
+          fs.classList.remove('error');
+          const m = fs.querySelector('.msg'); if (m) m.remove();
+        });
+        const span = document.createElement('span');
+        span.textContent = q.labels[lang][i];
+        label.append(input, span);
+        wrap.appendChild(label);
+      });
+      fs.appendChild(wrap);
+    }
+    form.appendChild(fs);
+  });
+}
+
+function hideError() { $('#formError').classList.add('hidden'); }
+
+function submitSurvey() {
+  let firstBad = null;
+  activeQuestions().forEach(q => {
+    if (q.optional) return;
+    const fs = document.querySelector('fieldset[data-id="' + q.id + '"]');
+    const bad = !answers[q.id];
+    fs.classList.toggle('error', bad);
+    const old = fs.querySelector('.msg'); if (old) old.remove();
+    if (bad) {
+      const m = document.createElement('p');
+      m.className = 'msg'; m.textContent = UI[lang].pick;
+      fs.appendChild(m);
+      if (!firstBad) firstBad = fs;
+    }
+  });
+  if (firstBad) {
+    const e = $('#formError');
+    e.textContent = UI[lang].formError;
+    e.classList.remove('hidden');
+    firstBad.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    return;
+  }
+
+  const record = {
+    id: Date.now() + '-' + Math.random().toString(36).slice(2, 8),
+    date: todayString(),
+    channel: channel,
+    household: answers.household,
+    under5: answers.under5,
+    visits: answers.visits,
+    impact: answers.impact,
+    learned: (answers.learned || '').trim(),
+    language: lang === 'es' ? 'Spanish' : 'English',
+    synced: false
+  };
+  const all = loadAll();
+  all.push(record);
+  saveAll(all);
+  syncPending();
+
+  const t = UI[lang];
+  $('#thanksTitle').textContent = t.thanksTitle;
+  $('#thanksText').textContent = t.thanksText;
+  $('#nextBtn').textContent = t.next;
+  show('Thanks');
+  clearTimeout(returnTimer);
+  returnTimer = setTimeout(resetToStart, CONFIG.RETURN_SECONDS * 1000);
+}
+
+function resetToStart() {
+  clearTimeout(returnTimer);
+  answers = {};
+  document.documentElement.lang = 'en';
+  show('Lang');
+}
+
+/* Optional live sync to a Google Sheet via Apps Script */
+let syncing = false;
+async function syncPending() {
+  if (!CONFIG.SHEET_ENDPOINT || syncing) return;
+  syncing = true;
+  const sentIds = [];
+  try {
+    for (const r of loadAll().filter(x => !x.synced)) {
+      await fetch(CONFIG.SHEET_ENDPOINT, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({ header: COLUMN_HEADERS, row: recordToRow(r).map(guard) })
+      });
+      sentIds.push(r.id);
+    }
+  } catch (e) { /* offline: try again after the next submission or page load */ }
+  if (sentIds.length) {
+    saveAll(loadAll().map(r => sentIds.includes(r.id) ? Object.assign(r, { synced: true }) : r));
+  }
+  syncing = false;
+}
+
+/* ============================================================
+   STAFF EXPORT PANEL
+   ============================================================ */
+function download(filename, text) {
+  const blob = new Blob(['\ufeff' + text], { type: 'text/csv;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+function stamp() {
+  const d = new Date(), p = n => String(n).padStart(2, '0');
+  return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate());
+}
+function adminMsg(t) { $('#adminMsg').textContent = t; }
+
+function refreshAdmin() {
+  const all = loadAll();
+  $('#adminCount').textContent = all.length;
+  const pending = all.filter(r => !r.synced).length;
+  $('#adminSub').textContent = CONFIG.SHEET_ENDPOINT
+    ? 'responses saved on this device (' + pending + ' not yet sent to Google Sheets)'
+    : 'responses saved on this device';
+}
+
+function initAdmin() {
+  refreshAdmin();
+  $('#dlRows').onclick = () => {
+    const all = loadAll();
+    if (!all.length) return adminMsg('No responses to export yet.');
+    download('ccf-survey-rows-' + stamp() + '.csv', toCsv(rowsTable(all)));
+    adminMsg('Downloaded ' + all.length + ' responses (one row per household).');
+  };
+  $('#dlCols').onclick = () => {
+    const all = loadAll();
+    if (!all.length) return adminMsg('No responses to export yet.');
+    download('ccf-survey-results-layout-' + stamp() + '.csv', toCsv(colsTable(all)));
+    adminMsg('Downloaded ' + all.length + ' responses (Results-sheet layout).');
+  };
+  $('#copyRows').onclick = async () => {
+    const all = loadAll();
+    if (!all.length) return adminMsg('No responses to copy yet.');
+    const text = toTsv(rowsTable(all));
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch (e) {
+      const ta = document.createElement('textarea');
+      ta.value = text; document.body.appendChild(ta); ta.select();
+      document.execCommand('copy'); ta.remove();
+    }
+    adminMsg('Copied. Click cell A1 in Google Sheets and paste.');
+  };
+  $('#clearAll').onclick = () => {
+    if (confirm('Delete all saved responses on this device? This cannot be undone.')) {
+      saveAll([]); refreshAdmin(); adminMsg('All responses deleted from this device.');
+    }
+  };
+}
+
+/* ============================================================
+   START
+   ============================================================ */
+document.querySelectorAll('[data-lang]').forEach(b => b.addEventListener('click', () => startSurvey(b.dataset.lang)));
+document.querySelectorAll('[data-switch]').forEach(b => b.addEventListener('click', () => setLang(b.dataset.switch)));
+$('#submitBtn').addEventListener('click', submitSurvey);
+$('#nextBtn').addEventListener('click', resetToStart);
+
+if (params.has('admin')) {
+  initAdmin();
+  show('Admin');
+} else {
+  show('Lang');
+  syncPending();
+}
+</script>
+</body>
+</html>
