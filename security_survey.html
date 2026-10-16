@@ -150,6 +150,13 @@
     <button class="btn secondary" id="nextBtn" type="button"></button>
   </section>
 
+  <!-- 4. Already completed -->
+  <section id="screenDone" class="hidden thanks">
+    <h1>Thank you!<br>¡Gracias!</h1>
+    <p>You have already completed this survey on this device.</p>
+    <p>Ya completó esta encuesta en este dispositivo.</p>
+  </section>
+
   <!-- Staff-only export panel: open index.html?admin=1 -->
   <section id="screenAdmin" class="hidden">
     <p class="org">Staff export</p>
@@ -175,31 +182,44 @@
       <h2>Clear this device</h2>
       <p>Only do this after you have exported and checked your data in Google Sheets.</p>
       <button class="btn danger small" id="clearAll" type="button">Delete all saved responses</button>
+      <p style="margin-top:18px">Testing? This lets the survey be completed again on this device.</p>
+      <button class="btn secondary small" id="allowAgain" type="button">Allow another survey on this device</button>
     </div>
     <p><a href="./">Back to survey</a></p>
   </section>
 </main>
 
 <script>
+/* If anything goes wrong, show it on the page instead of leaving it blank. */
+window.addEventListener('error', function (e) {
+  var d = document.createElement('div');
+  d.style.cssText = 'margin:16px;padding:14px;border:2px solid #b3261e;background:#fff;color:#b3261e;font:16px/1.4 system-ui,sans-serif';
+  d.textContent = 'Survey error: ' + (e.message || 'unknown') + ' (line ' + (e.lineno || '?') + '). Please tell the survey administrator.';
+  document.body.appendChild(d);
+});
+</script>
+<script>
 /* ============================================================
    SETTINGS
    ============================================================ */
 const CONFIG = {
   // Written to the "Channel" row/column. Override per device with ?channel=Drive-through
-  CHANNEL: 'Walk-up',
+  CHANNEL: 'Drive-through',
 
-  // The Results sheet has a "How did you first learn…" row, but the printed survey does not.
-  // Set to false to hide the question (the column is still exported, left blank).
-  SHOW_HOW_LEARNED: true,
+  // true: each phone/browser can submit once, then sees an "already completed" message.
+  // Set to false for a shared tablet where many people take turns (adds a "new survey" button).
+  ONE_PER_DEVICE: true,
 
-  // Optional: send each response straight to a Google Sheet (see the Apps Script below).
-  // Leave '' to only save on the device and export a CSV from ?admin=1.
+  // Paste the Apps Script *web app* URL here (see the script below). It looks like
+  //   https://script.google.com/macros/s/AKfycb.../exec
+  // NOT the Google Sheet's own address (docs.google.com/spreadsheets/...), which cannot receive data.
   SHEET_ENDPOINT: '',
 
   // Seconds before the thank-you screen returns to language selection.
   RETURN_SECONDS: 8,
 
-  STORAGE_KEY: 'ccf_food_security_responses_v1'
+  STORAGE_KEY: 'ccf_food_security_responses_v1',
+  DONE_KEY: 'ccf_food_security_completed_v1'
 };
 
 /* Optional Google Apps Script for SHEET_ENDPOINT
@@ -301,7 +321,7 @@ const COLUMN_HEADERS = [
   QUESTIONS[0].text.en,
   QUESTIONS[2].text.en,
   QUESTIONS[3].text.en,
-  QUESTIONS[4].text.en,
+  'How did you first learn of our Feeding Phoenix food distribution?',
   'English or Spanish',
   QUESTIONS[1].text.en
 ];
@@ -354,10 +374,26 @@ function colsTable(list) {
     [i < 2 ? '' : h, ''].concat(list.map(r => recordToRow(r)[i])));
 }
 
+/* One completion per device (browser). This is a soft limit: clearing browser data,
+   private mode, or another browser/device can get around it. */
+function hasCompleted() {
+  if (!CONFIG.ONE_PER_DEVICE) return false;
+  try { if (localStorage.getItem(CONFIG.DONE_KEY)) return true; } catch (e) {}
+  return document.cookie.split('; ').some(c => c.indexOf(CONFIG.DONE_KEY + '=') === 0);
+}
+function markCompleted() {
+  try { localStorage.setItem(CONFIG.DONE_KEY, todayString()); } catch (e) {}
+  document.cookie = CONFIG.DONE_KEY + '=1; max-age=' + (60 * 60 * 24 * 365) + '; path=/; SameSite=Lax';
+}
+function clearCompleted() {
+  try { localStorage.removeItem(CONFIG.DONE_KEY); } catch (e) {}
+  document.cookie = CONFIG.DONE_KEY + '=; max-age=0; path=/';
+}
+
 /* ============================================================
    SURVEY FLOW
    ============================================================ */
-const screens = ['Lang', 'Survey', 'Thanks', 'Admin'];
+const screens = ['Lang', 'Survey', 'Thanks', 'Done', 'Admin'];
 function show(name) {
   screens.forEach(s => $('#screen' + s).classList.toggle('hidden', s !== name));
   window.scrollTo(0, 0);
@@ -367,9 +403,7 @@ let lang = 'en';
 let answers = {};
 let returnTimer = null;
 
-function activeQuestions() {
-  return QUESTIONS.filter(q => q.id !== 'learned' || CONFIG.SHOW_HOW_LEARNED);
-}
+function activeQuestions() { return QUESTIONS; }
 
 function startSurvey(l) {
   answers = {};
@@ -438,6 +472,7 @@ function renderForm() {
 function hideError() { $('#formError').classList.add('hidden'); }
 
 function submitSurvey() {
+  if (hasCompleted()) { show('Done'); return; }
   let firstBad = null;
   activeQuestions().forEach(q => {
     if (q.optional) return;
@@ -475,15 +510,17 @@ function submitSurvey() {
   const all = loadAll();
   all.push(record);
   saveAll(all);
+  markCompleted();
   syncPending();
 
   const t = UI[lang];
   $('#thanksTitle').textContent = t.thanksTitle;
   $('#thanksText').textContent = t.thanksText;
   $('#nextBtn').textContent = t.next;
+  $('#nextBtn').classList.toggle('hidden', CONFIG.ONE_PER_DEVICE);
   show('Thanks');
   clearTimeout(returnTimer);
-  returnTimer = setTimeout(resetToStart, CONFIG.RETURN_SECONDS * 1000);
+  if (!CONFIG.ONE_PER_DEVICE) returnTimer = setTimeout(resetToStart, CONFIG.RETURN_SECONDS * 1000);
 }
 
 function resetToStart() {
@@ -493,10 +530,16 @@ function resetToStart() {
   show('Lang');
 }
 
-/* Optional live sync to a Google Sheet via Apps Script */
+/* Live sync to a Google Sheet via an Apps Script web app */
+function endpointOk() {
+  return /^https:\/\/script\.google\.com\/.+\/exec$/.test(CONFIG.SHEET_ENDPOINT);
+}
+if (CONFIG.SHEET_ENDPOINT && !endpointOk()) {
+  console.warn('SHEET_ENDPOINT must be an Apps Script web app URL ending in /exec. Responses are NOT being sent.');
+}
 let syncing = false;
 async function syncPending() {
-  if (!CONFIG.SHEET_ENDPOINT || syncing) return;
+  if (!endpointOk() || syncing) return;
   syncing = true;
   const sentIds = [];
   try {
@@ -539,9 +582,15 @@ function refreshAdmin() {
   const all = loadAll();
   $('#adminCount').textContent = all.length;
   const pending = all.filter(r => !r.synced).length;
-  $('#adminSub').textContent = CONFIG.SHEET_ENDPOINT
-    ? 'responses saved on this device (' + pending + ' not yet sent to Google Sheets)'
-    : 'responses saved on this device';
+  let sub = 'responses saved on this device';
+  if (!CONFIG.SHEET_ENDPOINT) {
+    sub += '. Warning: SHEET_ENDPOINT is empty, so responses are NOT being sent to Google Sheets.';
+  } else if (!endpointOk()) {
+    sub += '. Warning: SHEET_ENDPOINT is not an Apps Script web app URL (it must start with https://script.google.com/ and end in /exec), so nothing is being sent.';
+  } else {
+    sub += ' (' + pending + ' not yet sent to Google Sheets)';
+  }
+  $('#adminSub').textContent = sub;
 }
 
 function initAdmin() {
@@ -571,6 +620,7 @@ function initAdmin() {
     }
     adminMsg('Copied. Click cell A1 in Google Sheets and paste.');
   };
+  $('#allowAgain').onclick = () => { clearCompleted(); adminMsg('This device can complete the survey again.'); };
   $('#clearAll').onclick = () => {
     if (confirm('Delete all saved responses on this device? This cannot be undone.')) {
       saveAll([]); refreshAdmin(); adminMsg('All responses deleted from this device.');
@@ -589,6 +639,9 @@ $('#nextBtn').addEventListener('click', resetToStart);
 if (params.has('admin')) {
   initAdmin();
   show('Admin');
+} else if (hasCompleted()) {
+  show('Done');
+  syncPending();
 } else {
   show('Lang');
   syncPending();
