@@ -186,15 +186,15 @@
    ============================================================ */
 const CONFIG = {
   // Written to the "Channel" row/column. Override per device with ?channel=Drive-through
-  CHANNEL: 'Walk-up',
+  CHANNEL: 'Drive-through',
 
   // The Results sheet has a "How did you first learn…" row, but the printed survey does not.
   // Set to false to hide the question (the column is still exported, left blank).
-  SHOW_HOW_LEARNED: true,
+  SHOW_HOW_LEARNED: false,
 
   // Optional: send each response straight to a Google Sheet (see the Apps Script below).
   // Leave '' to only save on the device and export a CSV from ?admin=1.
-  SHEET_ENDPOINT: '',
+  SHEET_ENDPOINT: 'https://docs.google.com/spreadsheets/d/1rK5RtEzTb3xHqn_ujJBRBjHtFNEnGnE-tQMvd_Yh_S4/edit?gid=0#gid=0',
 
   // Seconds before the thank-you screen returns to language selection.
   RETURN_SECONDS: 8,
