@@ -222,17 +222,117 @@ const CONFIG = {
   DONE_KEY: 'ccf_food_security_completed_v1'
 };
 
-/* Optional Google Apps Script for SHEET_ENDPOINT
-   (Sheet > Extensions > Apps Script > paste > Deploy > Web app, access: Anyone):
+/* Google Apps Script for SHEET_ENDPOINT. It writes each submission to the Data tab of the
+   "Security Data and Analysis" spreadsheet, matching columns by header and adding new ones.
+   Copy everything between the dashed lines into the Apps Script project, save, then
+   Deploy > Manage deployments > pencil icon > Version: New version > Deploy.
+   ------------------------------------------------------------------------------------
+// CCF Food Security Survey -> "Security Data and Analysis" spreadsheet, Data tab.
+//
+// Each submission arrives as a list of { header, aliases, value } fields.
+// Every field is matched to an existing column in row 1 of the Data tab,
+// ignoring case, spaces, line breaks and punctuation. A field whose header
+// is not found gets a new column at the right-hand end, so new survey
+// questions show up in the sheet without editing this script.
+//
+// Install: open the existing Apps Script project behind SHEET_ENDPOINT,
+// replace all of its code with this file, save, then
+// Deploy > Manage deployments > pencil icon > Version: New version > Deploy.
+// Editing the existing deployment keeps the same /exec URL.
 
-   function doPost(e) {
-     var d = JSON.parse(e.postData.contents);
-     var ss = SpreadsheetApp.getActiveSpreadsheet();
-     var sh = ss.getSheetByName('Responses') || ss.insertSheet('Responses');
-     if (sh.getLastRow() === 0) sh.appendRow(d.header);
-     sh.appendRow(d.row);
-     return ContentService.createTextOutput('ok');
-   }
+var SPREADSHEET_ID = '1QLimp-K6Q95eCaI2HPycUPdO7Buk8-FDipKdaChmlV0';
+var SHEET_NAME = 'Data';
+var HEADER_ROW = 1;
+var MAX_NEW_COLUMNS_PER_SUBMISSION = 10;  // stops a bad request from adding hundreds of columns
+var MAX_HEADER_LENGTH = 400;
+var MAX_VALUE_LENGTH = 2000;
+
+// Survey names whose sheet column has a different header. The survey can also send its own aliases.
+var HEADER_ALIASES = {
+  'Channel': ['Walk-up / Drive-through / Wednesday']
+};
+
+function doPost(e) {
+  var lock = LockService.getScriptLock();
+  lock.waitLock(30000);  // two phones submitting at once must not land on the same row
+  try {
+    var d = JSON.parse(e.postData.contents);
+    // Older versions of the survey sent { header: [...], row: [...] } instead of fields.
+    var fields = d.fields;
+    if (!fields) {
+      fields = [{ header: 'Digital or Paper', value: 'Digital' }].concat((d.header || []).map(function (h, i) {
+        return { header: h, value: (d.row || [])[i] };
+      }));
+    }
+    var sh = SpreadsheetApp.openById(SPREADSHEET_ID).getSheetByName(SHEET_NAME);
+    if (!sh) throw new Error('Tab not found: ' + SHEET_NAME);
+    writeRow_(sh, fields);
+    return ContentService.createTextOutput('ok');
+  } catch (err) {
+    console.error(err);
+    return ContentService.createTextOutput('error: ' + err.message);
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function writeRow_(sh, fields) {
+  var lastCol = Math.max(sh.getLastColumn(), 1);
+  var headers = sh.getRange(HEADER_ROW, 1, 1, lastCol).getValues()[0];
+  while (headers.length && String(headers[headers.length - 1]).trim() === '') headers.pop();
+
+  var index = {};
+  headers.forEach(function (h, i) {
+    var k = norm_(h);
+    if (k && !(k in index)) index[k] = i;
+  });
+
+  var row = [];
+  var added = 0;
+  fields.forEach(function (f) {
+    if (!f || !f.header) return;
+    var names = [f.header].concat(f.aliases || [], HEADER_ALIASES[f.header] || []);
+    var col = -1;
+    for (var j = 0; j < names.length && col < 0; j++) {
+      var k = norm_(names[j]);
+      if (k && k in index) col = index[k];
+    }
+    if (col < 0) {
+      var header = String(f.header);
+      if (!norm_(header) || header.length > MAX_HEADER_LENGTH || added >= MAX_NEW_COLUMNS_PER_SUBMISSION) return;
+      col = headers.length;
+      if (col + 1 > sh.getMaxColumns()) sh.insertColumnsAfter(sh.getMaxColumns(), 5);
+      sh.getRange(HEADER_ROW, col + 1).setValue(guard_(header));
+      headers.push(header);
+      index[norm_(header)] = col;
+      added++;
+    }
+    row[col] = cell_(f.value);
+  });
+
+  for (var c = 0; c < headers.length; c++) if (row[c] === undefined) row[c] = '';
+  var target = sh.getLastRow() + 1;
+  if (target > sh.getMaxRows()) sh.insertRowsAfter(sh.getMaxRows(), 100);
+  // Plain strings are parsed the way typing them would be: "11/3/2026" becomes a date, "2" a number.
+  sh.getRange(target, 1, 1, headers.length).setValues([row]);
+}
+
+// "Walk-up / \nDrive-through / \nWednesday" and "Walk-up / Drive-through / Wednesday" both become "walkupdrivethroughwednesday".
+function norm_(s) {
+  return String(s == null ? '' : s).toLowerCase().replace(/[^a-z0-9]+/g, '');
+}
+
+function cell_(v) {
+  if (v === null || v === undefined) return '';
+  return guard_(String(v).trim().slice(0, MAX_VALUE_LENGTH));
+}
+
+// Stop Sheets from running submitted text as a formula.
+function guard_(s) {
+  s = String(s);
+  return /^[=+\-@\t\r]/.test(s) ? "'" + s : s;
+}
+   ------------------------------------------------------------------------------------
 */
 
 /* ============================================================
@@ -374,6 +474,28 @@ function colsTable(list) {
     [i < 2 ? '' : h, ''].concat(list.map(r => recordToRow(r)[i])));
 }
 
+/* What gets sent to the sheet, one entry per column. The Apps Script matches each header
+   (or one of its aliases) to a column in row 1 of the Data tab, ignoring case, spacing and
+   punctuation, and adds a new column for any header it can't find. Every question in
+   QUESTIONS is included automatically under its English text. If you reword a question and
+   want its answers to stay in the same column, add the old wording to that question as
+   sheetAliases: ['old wording'], or rename the column header in the sheet to match. */
+const SHEET_FIELDS = [
+  { header: 'Digital or Paper', value: r => 'Digital' },
+  { header: 'Date', value: r => r.date },
+  { header: 'Channel', aliases: ['Walk-up / Drive-through / Wednesday'], value: r => r.channel },
+  { header: 'English or Spanish', value: r => r.language }
+];
+function sheetFields(r) {
+  const a = r.answers || r;  // records saved before this change keep answers at the top level
+  return SHEET_FIELDS.map(f => ({ header: f.header, aliases: f.aliases || [], value: guard(f.value(r)) }))
+    .concat(activeQuestions().map(q => ({
+      header: q.text.en,
+      aliases: q.sheetAliases || [],
+      value: guard(a[q.id] == null ? '' : a[q.id])
+    })));
+}
+
 /* One completion per device (browser). This is a soft limit: clearing browser data,
    private mode, or another browser/device can get around it. */
 function hasCompleted() {
@@ -510,6 +632,7 @@ function submitSurvey() {
     impact: answers.impact,
     learned: (answers.learned || '').trim(),
     language: lang === 'es' ? 'Spanish' : 'English',
+    answers: Object.assign({}, answers),
     synced: false
   };
   const all = loadAll();
@@ -553,7 +676,7 @@ async function syncPending() {
         method: 'POST',
         mode: 'no-cors',
         headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-        body: JSON.stringify({ header: COLUMN_HEADERS, row: recordToRow(r).map(guard) })
+        body: JSON.stringify({ fields: sheetFields(r), header: COLUMN_HEADERS, row: recordToRow(r).map(guard) })
       });
       sentIds.push(r.id);
     }
