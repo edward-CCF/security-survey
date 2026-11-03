@@ -153,8 +153,8 @@
   <!-- 4. Already completed -->
   <section id="screenDone" class="hidden thanks">
     <h1>Thank you!<br>¡Gracias!</h1>
-    <p>You have already completed this survey on this device.</p>
-    <p>Ya completó esta encuesta en este dispositivo.</p>
+    <p>You have already completed this survey on this device today.</p>
+    <p>Hoy ya completó esta encuesta en este dispositivo.</p>
   </section>
 
   <!-- Staff-only export panel: open index.html?admin=1 -->
@@ -206,7 +206,7 @@ const CONFIG = {
   // Written to the "Channel" row/column. Override per device with ?channel=Drive-through
   CHANNEL: 'Drive-through',
 
-  // true: each phone/browser can submit once, then sees an "already completed" message.
+  // true: each phone/browser can submit once per day (resets at midnight), then sees an "already completed" message.
   // Set to false for a shared tablet where many people take turns (adds a "new survey" button).
   ONE_PER_DEVICE: true,
 
@@ -378,12 +378,17 @@ function colsTable(list) {
    private mode, or another browser/device can get around it. */
 function hasCompleted() {
   if (!CONFIG.ONE_PER_DEVICE) return false;
-  try { if (localStorage.getItem(CONFIG.DONE_KEY)) return true; } catch (e) {}
-  return document.cookie.split('; ').some(c => c.indexOf(CONFIG.DONE_KEY + '=') === 0);
+  const today = todayString();
+  try { if (localStorage.getItem(CONFIG.DONE_KEY) === today) return true; } catch (e) {}
+  return document.cookie.split('; ').some(c => c === CONFIG.DONE_KEY + '=' + encodeURIComponent(today));
 }
 function markCompleted() {
-  try { localStorage.setItem(CONFIG.DONE_KEY, todayString()); } catch (e) {}
-  document.cookie = CONFIG.DONE_KEY + '=1; max-age=' + (60 * 60 * 24 * 365) + '; path=/; SameSite=Lax';
+  const today = todayString();
+  try { localStorage.setItem(CONFIG.DONE_KEY, today); } catch (e) {}
+  // Cookie expires at the next local midnight, so the block resets daily.
+  const midnight = new Date(); midnight.setHours(24, 0, 0, 0);
+  document.cookie = CONFIG.DONE_KEY + '=' + encodeURIComponent(today) +
+    '; expires=' + midnight.toUTCString() + '; path=/; SameSite=Lax';
 }
 function clearCompleted() {
   try { localStorage.removeItem(CONFIG.DONE_KEY); } catch (e) {}
