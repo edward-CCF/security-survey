@@ -347,19 +347,19 @@ const QUESTIONS = [
   {
     id: 'household', wide: false,
     text: { en: 'How many people are in your household?', es: '¿Cuántas personas viven en su hogar?' },
-    values: ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12 or more'],
+    values: ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', 'more than 11'],
     labels: {
-      en: ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12 or more'],
-      es: ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12 o más']
+      en: ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', 'more than 11'],
+      es: ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', 'más de 11']
     }
   },
   {
     id: 'under5', wide: false,
     text: { en: 'How many people under five years of age are in your household?', es: '¿Cuántas personas menores de cinco años viven en su hogar?' },
-    values: ['0', '1', '2', '3', '4', '5 or more'],
+    values: ['0', '1', '2', '3', '4', 'more than 4'],
     labels: {
-      en: ['0', '1', '2', '3', '4', '5 or more'],
-      es: ['0', '1', '2', '3', '4', '5 o más']
+      en: ['0', '1', '2', '3', '4', 'more than 4'],
+      es: ['0', '1', '2', '3', '4', 'más de 4']
     }
   },
   {
@@ -618,11 +618,11 @@ function submitSurvey() {
   });
   let onlyUnder5 = false;
   // Consistency check: a household can't have as many or more people under five
-  // than people in total (October 17 had three such responses). "12 or more" and
-  // "5 or more" are read as 12 and 5.
+  // than people in total (October 17 had three such responses). "more than 11" and
+  // "more than 4" are read as 12 and 5.
   if (answers.household && answers.under5) {
-    const hh = parseInt(answers.household, 10);
-    const u5 = parseInt(answers.under5, 10);
+    const hh = answers.household === 'more than 11' ? 12 : parseInt(answers.household, 10);
+    const u5 = answers.under5 === 'more than 4' ? 5 : parseInt(answers.under5, 10);
     if (u5 >= hh) {
       if (!firstBad) onlyUnder5 = true;
       const fs = document.querySelector('fieldset[data-id="under5"]');
