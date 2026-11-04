@@ -1,0 +1,800 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CCF Food Security Survey / Encuesta de seguridad alimentaria</title>
+<style>
+  :root {
+    --ink: #1c2b2d;
+    --muted: #55686b;
+    --paper: #ffffff;
+    --ground: #eef3f2;
+    --line: #c5d3d1;
+    --green: #1f6b4e;
+    --green-dark: #154c37;
+    --sun: #f0b429;
+    --error: #b3261e;
+    --radius: 14px;
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font: 18px/1.5 "Avenir Next", "Segoe UI", Roboto, system-ui, sans-serif;
+  }
+  main { max-width: 760px; margin: 0 auto; padding: 20px 16px 56px; }
+  .org { margin: 8px 0 24px; font-weight: 600; color: var(--green-dark); }
+  h1 { font-size: clamp(1.7rem, 5vw, 2.3rem); line-height: 1.15; margin: 0 0 12px; letter-spacing: -0.01em; }
+  p { margin: 0 0 16px; }
+  .hidden { display: none !important; }
+
+  /* Language chooser: the first thing people see */
+  .lang-grid { display: grid; gap: 16px; margin-top: 28px; }
+  @media (min-width: 600px) { .lang-grid { grid-template-columns: 1fr 1fr; } }
+  .lang-btn {
+    min-height: 150px;
+    border: 0;
+    border-radius: 20px;
+    background: var(--green);
+    color: #fff;
+    font: inherit;
+    font-size: clamp(2rem, 7vw, 2.8rem);
+    font-weight: 700;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 6px 0 var(--green-dark);
+    transition: transform .08s, box-shadow .08s;
+  }
+  .lang-btn:active { transform: translateY(4px); box-shadow: 0 2px 0 var(--green-dark); }
+  .lang-btn.alt { background: var(--sun); color: var(--ink); box-shadow: 0 6px 0 #b98712; }
+  .lang-btn.alt:active { box-shadow: 0 2px 0 #b98712; }
+
+  /* Survey */
+  .topbar { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
+  .switch { display: inline-flex; border: 2px solid var(--green); border-radius: 999px; overflow: hidden; }
+  .switch button {
+    border: 0; background: transparent; color: var(--green-dark);
+    font: inherit; font-size: .9rem; font-weight: 600; padding: 6px 16px; cursor: pointer; min-height: 40px;
+  }
+  .switch button[aria-pressed="true"] { background: var(--green); color: #fff; }
+  .intro { color: var(--muted); }
+
+  fieldset {
+    margin: 0 0 20px; padding: 18px 18px 20px;
+    background: var(--paper); border: 2px solid var(--line); border-radius: var(--radius);
+  }
+  fieldset.error { border-color: var(--error); }
+  legend { float: left; width: 100%; padding: 0; margin: 0 0 12px; font-weight: 700; font-size: 1.05rem; }
+  legend + * { clear: both; }
+  .opts { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(84px, 1fr)); margin-top: 6px; }
+  .opts.wide { grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); }
+  .opt { position: relative; display: block; }
+  .opt input { position: absolute; opacity: 0; inset: 0; width: 100%; height: 100%; margin: 0; cursor: pointer; }
+  .opt span {
+    display: flex; align-items: center; justify-content: center; text-align: center;
+    min-height: 58px; padding: 8px 10px;
+    border: 2px solid var(--line); border-radius: 12px; background: #fff;
+    font-weight: 600; transition: background .1s, border-color .1s;
+  }
+  .opt input:checked + span { background: var(--green); border-color: var(--green); color: #fff; }
+  .opt input:focus-visible + span { outline: 4px solid var(--sun); outline-offset: 2px; }
+  .opt:hover input:not(:checked) + span { border-color: var(--green); }
+  .msg { color: var(--error); font-weight: 600; margin: 10px 0 0; }
+  textarea {
+    width: 100%; min-height: 90px; padding: 12px; font: inherit; color: inherit;
+    border: 2px solid var(--line); border-radius: 12px; resize: vertical;
+  }
+  textarea:focus-visible { outline: 4px solid var(--sun); outline-offset: 2px; border-color: var(--green); }
+
+  .btn {
+    border: 0; border-radius: 12px; background: var(--green); color: #fff;
+    font: inherit; font-weight: 700; padding: 14px 28px; min-height: 56px; cursor: pointer;
+  }
+  .btn:hover { background: var(--green-dark); }
+  .btn:focus-visible { outline: 4px solid var(--sun); outline-offset: 2px; }
+  .btn.secondary { background: #fff; color: var(--green-dark); border: 2px solid var(--green); }
+  .btn.danger { background: #fff; color: var(--error); border: 2px solid var(--error); }
+  .btn.small { min-height: 44px; padding: 8px 18px; font-size: .95rem; }
+  #formError { color: var(--error); font-weight: 700; margin: 0 0 14px; }
+
+  .thanks { text-align: center; padding: 56px 0; }
+  .thanks h1 { font-size: clamp(2.2rem, 8vw, 3.2rem); }
+
+  /* Staff export panel */
+  .panel { background: var(--paper); border: 2px solid var(--line); border-radius: var(--radius); padding: 20px; margin-bottom: 18px; }
+  .panel h2 { margin: 0 0 6px; font-size: 1.15rem; }
+  .panel p { color: var(--muted); font-size: .95rem; }
+  .row { display: flex; gap: 10px; flex-wrap: wrap; }
+  .stat { font-size: 2.4rem; font-weight: 700; line-height: 1; }
+  .ok { color: var(--green-dark); font-weight: 600; min-height: 1.5em; }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+<main>
+  <noscript><p>This survey needs JavaScript. / Esta encuesta necesita JavaScript.</p></noscript>
+
+  <!-- 1. Language selection -->
+  <section id="screenLang" class="hidden">
+    <p class="org">Creighton Community Foundation</p>
+    <h1>Choose your language<br>Elija su idioma</h1>
+    <div class="lang-grid">
+      <button class="lang-btn" type="button" data-lang="en" lang="en">English</button>
+      <button class="lang-btn alt" type="button" data-lang="es" lang="es">Español</button>
+    </div>
+  </section>
+
+  <!-- 2. Survey -->
+  <section id="screenSurvey" class="hidden">
+    <div class="topbar">
+      <p class="org" style="margin:8px 0 16px">Creighton Community Foundation</p>
+      <div class="switch" role="group" aria-label="Language / Idioma">
+        <button type="button" data-switch="en" lang="en">English</button>
+        <button type="button" data-switch="es" lang="es">Español</button>
+      </div>
+    </div>
+    <h1 id="surveyTitle"></h1>
+    <p class="intro" id="surveyIntro"></p>
+    <form id="form" novalidate></form>
+    <p id="formError" role="alert" class="hidden"></p>
+    <button class="btn" id="submitBtn" type="button"></button>
+  </section>
+
+  <!-- 3. Thank you -->
+  <section id="screenThanks" class="hidden thanks" aria-live="polite">
+    <h1 id="thanksTitle"></h1>
+    <p id="thanksText"></p>
+    <button class="btn secondary" id="nextBtn" type="button"></button>
+  </section>
+
+  <!-- 4. Already completed -->
+  <section id="screenDone" class="hidden thanks">
+    <h1>Thank you!<br>¡Gracias!</h1>
+    <p>You have already completed this survey on this device today.</p>
+    <p>Hoy ya completó esta encuesta en este dispositivo.</p>
+  </section>
+
+  <!-- Staff-only export panel: open index.html?admin=1 -->
+  <section id="screenAdmin" class="hidden">
+    <p class="org">Staff export</p>
+    <h1>Survey responses</h1>
+    <div class="panel">
+      <div class="stat" id="adminCount">0</div>
+      <p id="adminSub">responses saved on this device</p>
+    </div>
+    <div class="panel">
+      <h2>Import into Google Sheets</h2>
+      <p><strong>One row per household:</strong> best for a new tab. In Sheets use <em>File &gt; Import &gt; Upload</em>, or click “Copy for Sheets” and paste into cell A1.</p>
+      <div class="row">
+        <button class="btn" id="dlRows" type="button">Download CSV (one row per household)</button>
+        <button class="btn secondary" id="copyRows" type="button">Copy for Sheets</button>
+      </div>
+      <p style="margin-top:18px"><strong>Same layout as “Food Security Survey Findings”:</strong> one column per household, with question labels in column A.</p>
+      <div class="row">
+        <button class="btn secondary" id="dlCols" type="button">Download CSV (Results-sheet layout)</button>
+      </div>
+      <p class="ok" id="adminMsg" role="status"></p>
+    </div>
+    <div class="panel">
+      <h2>Clear this device</h2>
+      <p>Only do this after you have exported and checked your data in Google Sheets.</p>
+      <button class="btn danger small" id="clearAll" type="button">Delete all saved responses</button>
+      <p style="margin-top:18px">Testing? This lets the survey be completed again on this device.</p>
+      <button class="btn secondary small" id="allowAgain" type="button">Allow another survey on this device</button>
+    </div>
+    <p><a href="./">Back to survey</a></p>
+  </section>
+</main>
+
+<script>
+/* If anything goes wrong, show it on the page instead of leaving it blank. */
+window.addEventListener('error', function (e) {
+  var d = document.createElement('div');
+  d.style.cssText = 'margin:16px;padding:14px;border:2px solid #b3261e;background:#fff;color:#b3261e;font:16px/1.4 system-ui,sans-serif';
+  d.textContent = 'Survey error: ' + (e.message || 'unknown') + ' (line ' + (e.lineno || '?') + '). Please tell the survey administrator.';
+  document.body.appendChild(d);
+});
+</script>
+<script>
+/* ============================================================
+   SETTINGS
+   ============================================================ */
+const CONFIG = {
+  // Written to the "Channel" row/column. Override per device with ?channel=Drive-through
+  CHANNEL: 'Drive-through',
+
+  // true: each phone/browser can submit once per day (resets at midnight), then sees an "already completed" message.
+  // Set to false for a shared tablet where many people take turns (adds a "new survey" button).
+  ONE_PER_DEVICE: false,
+
+  // Paste the Apps Script *web app* URL here (see the script below). It looks like
+  //   https://script.google.com/macros/s/AKfycb.../exec
+  // NOT the Google Sheet's own address (docs.google.com/spreadsheets/...), which cannot receive data.
+  SHEET_ENDPOINT: 'https://script.google.com/macros/s/AKfycbzpBMDpvdgVI2BycPJQW_dYMBmp2wtV40MI8Srb5cCyKcRuFwTrlVZ9NTNzsdZAvksP/exec',
+
+  // Seconds before the thank-you screen returns to language selection.
+  RETURN_SECONDS: 8,
+
+  STORAGE_KEY: 'ccf_food_security_responses_v1',
+  DONE_KEY: 'ccf_food_security_completed_v1'
+};
+
+/* Google Apps Script for SHEET_ENDPOINT. It writes each submission to the Data tab of the
+   "Security Data and Analysis" spreadsheet, matching columns by header and adding new ones.
+   Copy everything between the dashed lines into the Apps Script project, save, then
+   Deploy > Manage deployments > pencil icon > Version: New version > Deploy.
+   ------------------------------------------------------------------------------------
+// CCF Food Security Survey -> "Security Data and Analysis" spreadsheet, Data tab.
+//
+// Each submission arrives as a list of { header, aliases, value } fields.
+// Every field is matched to an existing column in row 1 of the Data tab,
+// ignoring case, spaces, line breaks and punctuation. A field whose header
+// is not found gets a new column at the right-hand end, so new survey
+// questions show up in the sheet without editing this script.
+//
+// Install: open the existing Apps Script project behind SHEET_ENDPOINT,
+// replace all of its code with this file, save, then
+// Deploy > Manage deployments > pencil icon > Version: New version > Deploy.
+// Editing the existing deployment keeps the same /exec URL.
+
+var SPREADSHEET_ID = '1QLimp-K6Q95eCaI2HPycUPdO7Buk8-FDipKdaChmlV0';
+var SHEET_NAME = 'Data';
+var HEADER_ROW = 1;
+var MAX_NEW_COLUMNS_PER_SUBMISSION = 10;  // stops a bad request from adding hundreds of columns
+var MAX_HEADER_LENGTH = 400;
+var MAX_VALUE_LENGTH = 2000;
+
+// Survey names whose sheet column has a different header. The survey can also send its own aliases.
+var HEADER_ALIASES = {
+  'Channel': ['Walk-up / Drive-through / Wednesday']
+};
+
+function doPost(e) {
+  var lock = LockService.getScriptLock();
+  lock.waitLock(30000);  // two phones submitting at once must not land on the same row
+  try {
+    var d = JSON.parse(e.postData.contents);
+    // Older versions of the survey sent { header: [...], row: [...] } instead of fields.
+    var fields = d.fields;
+    if (!fields) {
+      fields = [{ header: 'Digital or Paper', value: 'Digital' }].concat((d.header || []).map(function (h, i) {
+        return { header: h, value: (d.row || [])[i] };
+      }));
+    }
+    var sh = SpreadsheetApp.openById(SPREADSHEET_ID).getSheetByName(SHEET_NAME);
+    if (!sh) throw new Error('Tab not found: ' + SHEET_NAME);
+    writeRow_(sh, fields);
+    return ContentService.createTextOutput('ok');
+  } catch (err) {
+    console.error(err);
+    return ContentService.createTextOutput('error: ' + err.message);
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function writeRow_(sh, fields) {
+  var lastCol = Math.max(sh.getLastColumn(), 1);
+  var headers = sh.getRange(HEADER_ROW, 1, 1, lastCol).getValues()[0];
+  while (headers.length && String(headers[headers.length - 1]).trim() === '') headers.pop();
+
+  var index = {};
+  headers.forEach(function (h, i) {
+    var k = norm_(h);
+    if (k && !(k in index)) index[k] = i;
+  });
+
+  var row = [];
+  var added = 0;
+  fields.forEach(function (f) {
+    if (!f || !f.header) return;
+    var names = [f.header].concat(f.aliases || [], HEADER_ALIASES[f.header] || []);
+    var col = -1;
+    for (var j = 0; j < names.length && col < 0; j++) {
+      var k = norm_(names[j]);
+      if (k && k in index) col = index[k];
+    }
+    if (col < 0) {
+      var header = String(f.header);
+      if (!norm_(header) || header.length > MAX_HEADER_LENGTH || added >= MAX_NEW_COLUMNS_PER_SUBMISSION) return;
+      col = headers.length;
+      if (col + 1 > sh.getMaxColumns()) sh.insertColumnsAfter(sh.getMaxColumns(), 5);
+      sh.getRange(HEADER_ROW, col + 1).setValue(guard_(header));
+      headers.push(header);
+      index[norm_(header)] = col;
+      added++;
+    }
+    row[col] = cell_(f.value);
+  });
+
+  for (var c = 0; c < headers.length; c++) if (row[c] === undefined) row[c] = '';
+  var target = sh.getLastRow() + 1;
+  if (target > sh.getMaxRows()) sh.insertRowsAfter(sh.getMaxRows(), 100);
+  // Plain strings are parsed the way typing them would be: "11/3/2026" becomes a date, "2" a number.
+  sh.getRange(target, 1, 1, headers.length).setValues([row]);
+}
+
+// "Walk-up / \nDrive-through / \nWednesday" and "Walk-up / Drive-through / Wednesday" both become "walkupdrivethroughwednesday".
+function norm_(s) {
+  return String(s == null ? '' : s).toLowerCase().replace(/[^a-z0-9]+/g, '');
+}
+
+function cell_(v) {
+  if (v === null || v === undefined) return '';
+  return guard_(String(v).trim().slice(0, MAX_VALUE_LENGTH));
+}
+
+// Stop Sheets from running submitted text as a formula.
+function guard_(s) {
+  s = String(s);
+  return /^[=+\-@\t\r]/.test(s) ? "'" + s : s;
+}
+   ------------------------------------------------------------------------------------
+*/
+
+/* ============================================================
+   QUESTIONS
+   "values" are the canonical English answers written to the sheet,
+   whichever language the respondent used (matches the Results sheet).
+   ============================================================ */
+const IMPACT_EN = ['Not at all', 'A little', 'A moderate amount', 'A lot', 'A great deal'];
+const VISITS_EN = ['0', '1 or 2', '3 or 4', '5 or 6', '7 or 8', '9 or 10', '11 or 12', 'more than 12'];
+
+const QUESTIONS = [
+  {
+    id: 'household', wide: false,
+    text: { en: 'How many people are in your household?', es: '¿Cuántas personas viven en su hogar?' },
+    values: ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', 'more than 11'],
+    labels: {
+      en: ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', 'more than 11'],
+      es: ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', 'más de 11']
+    }
+  },
+  {
+    id: 'under5', wide: false,
+    text: { en: 'How many people under five years of age are in your household?', es: '¿Cuántas personas menores de cinco años viven en su hogar?' },
+    values: ['0', '1', '2', '3', '4', 'more than 4'],
+    labels: {
+      en: ['0', '1', '2', '3', '4', 'more than 4'],
+      es: ['0', '1', '2', '3', '4', 'más de 4']
+    }
+  },
+  {
+    id: 'visits', wide: false,
+    text: {
+      en: "How many times has your household received food at CCF's Feeding Phoenix food distributions in the past 3 months?",
+      es: '¿Cuántas veces ha recibido su hogar alimentos en las distribuciones de alimentos de Feeding Phoenix de CCF durante los últimos 3 meses?'
+    },
+    values: VISITS_EN,
+    labels: {
+      en: VISITS_EN,
+      es: ['0', '1 o 2', '3 o 4', '5 o 6', '7 o 8', '9 o 10', '11 o 12', 'más de 12']
+    }
+  },
+  {
+    id: 'impact', wide: true,
+    text: {
+      en: "The USDA defines food security as having consistent access to enough food. How much do CCF's Feeding Phoenix food distributions increase your household's food security?",
+      es: 'El Departamento de Agricultura de los Estados Unidos (USDA) define la seguridad alimentaria como tener acceso constante a suficientes alimentos. ¿En qué medida las distribuciones de alimentos de Feeding Phoenix de CCF aumentan la seguridad alimentaria de su hogar?'
+    },
+    values: IMPACT_EN,
+    labels: {
+      en: IMPACT_EN,
+      es: ['Nada', 'Un poco', 'Moderadamente', 'Mucho', 'En gran medida']
+    }
+  }
+];
+
+const UI = {
+  en: {
+    title: 'Food Security Survey',
+    intro: 'This information will be used to shape Creighton Community Foundation (CCF) and inform our supporters. (please select one response per question)',
+    submit: 'Submit',
+    optional: '(optional)',
+    pick: 'Please select one answer.',
+    under5Check: 'Please check: the number of people under five should be less than the number of people in your household.',
+    formError: 'Please answer the questions marked in red.',
+    thanksTitle: 'Thank you!',
+    thanksText: 'Your answers help CCF and our supporters.',
+    next: 'Start a new survey'
+  },
+  es: {
+    title: 'Encuesta de seguridad alimentaria',
+    intro: 'Esta información se utilizará para ayudar a dar forma a la Fundación Comunitaria Creighton (CCF) e informar a nuestros colaboradores. (por favor, seleccione una respuesta por pregunta)',
+    submit: 'Enviar',
+    optional: '(opcional)',
+    pick: 'Seleccione una respuesta.',
+    under5Check: 'Por favor revise: el número de personas menores de cinco años debe ser menor que el número de personas en su hogar.',
+    formError: 'Por favor responda las preguntas marcadas en rojo.',
+    thanksTitle: '¡Gracias!',
+    thanksText: 'Sus respuestas ayudan a CCF y a nuestros colaboradores.',
+    next: 'Comenzar una nueva encuesta'
+  }
+};
+
+/* Column order mirrors the Results sheet (rows 1–7). "under5" is appended last so
+   existing row references in the sheet (e.g. rows 4 and 5) don't shift. */
+const COLUMN_HEADERS = [
+  'Date',
+  'Channel',
+  QUESTIONS[0].text.en,
+  QUESTIONS[2].text.en,
+  QUESTIONS[3].text.en,
+  'How did you first learn of our Feeding Phoenix food distribution?',
+  'English or Spanish',
+  QUESTIONS[1].text.en
+];
+
+/* ============================================================
+   STORAGE (falls back to memory if the browser blocks localStorage)
+   ============================================================ */
+let memoryStore = [];
+function loadAll() {
+  try {
+    const raw = localStorage.getItem(CONFIG.STORAGE_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch (e) { return memoryStore; }
+}
+function saveAll(list) {
+  memoryStore = list;
+  try { localStorage.setItem(CONFIG.STORAGE_KEY, JSON.stringify(list)); } catch (e) { /* memory only */ }
+}
+
+/* ============================================================
+   HELPERS
+   ============================================================ */
+const $ = (s) => document.querySelector(s);
+const params = new URLSearchParams(location.search);
+const channel = params.get('channel') || CONFIG.CHANNEL;
+
+function todayString() {
+  const d = new Date();
+  return (d.getMonth() + 1) + '/' + d.getDate() + '/' + d.getFullYear();
+}
+function guard(v) {               // stop Google Sheets from running typed text as a formula
+  const s = String(v == null ? '' : v);
+  return /^[=+\-@\t\r]/.test(s) ? ' ' + s : s;
+}
+function csvCell(v) {
+  const s = guard(v);
+  return /[",\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+}
+function toCsv(table) { return table.map(r => r.map(csvCell).join(',')).join('\r\n'); }
+function toTsv(table) {
+  return table.map(r => r.map(v => guard(v).replace(/[\t\r\n]+/g, ' ')).join('\t')).join('\n');
+}
+function recordToRow(r) {
+  return [r.date, r.channel, r.household, r.visits, r.impact, r.learned, r.language, r.under5];
+}
+function rowsTable(list) { return [COLUMN_HEADERS].concat(list.map(recordToRow)); }
+function colsTable(list) {
+  // One column per household; labels in A, blank B, answers from C (same as the Results sheet)
+  return COLUMN_HEADERS.map((h, i) =>
+    [i < 2 ? '' : h, ''].concat(list.map(r => recordToRow(r)[i])));
+}
+
+/* What gets sent to the sheet, one entry per column. The Apps Script matches each header
+   (or one of its aliases) to a column in row 1 of the Data tab, ignoring case, spacing and
+   punctuation, and adds a new column for any header it can't find. Every question in
+   QUESTIONS is included automatically under its English text. If you reword a question and
+   want its answers to stay in the same column, add the old wording to that question as
+   sheetAliases: ['old wording'], or rename the column header in the sheet to match. */
+const SHEET_FIELDS = [
+  { header: 'Digital or Paper', value: r => 'Digital' },
+  { header: 'Date', value: r => r.date },
+  { header: 'Channel', aliases: ['Walk-up / Drive-through / Wednesday'], value: r => r.channel },
+  { header: 'English or Spanish', value: r => r.language }
+];
+function sheetFields(r) {
+  const a = r.answers || r;  // records saved before this change keep answers at the top level
+  return SHEET_FIELDS.map(f => ({ header: f.header, aliases: f.aliases || [], value: guard(f.value(r)) }))
+    .concat(activeQuestions().map(q => ({
+      header: q.text.en,
+      aliases: q.sheetAliases || [],
+      value: guard(a[q.id] == null ? '' : a[q.id])
+    })));
+}
+
+/* One completion per device (browser). This is a soft limit: clearing browser data,
+   private mode, or another browser/device can get around it.
+function hasCompleted() {
+  if (!CONFIG.ONE_PER_DEVICE) return false;
+  const today = todayString();
+  try { if (localStorage.getItem(CONFIG.DONE_KEY) === today) return true; } catch (e) {}
+  return document.cookie.split('; ').some(c => c === CONFIG.DONE_KEY + '=' + encodeURIComponent(today));
+}
+function markCompleted() {
+  const today = todayString();
+  try { localStorage.setItem(CONFIG.DONE_KEY, today); } catch (e) {}
+  // Cookie expires at the next local midnight, so the block resets daily.
+  const midnight = new Date(); midnight.setHours(24, 0, 0, 0);
+  document.cookie = CONFIG.DONE_KEY + '=' + encodeURIComponent(today) +
+    '; expires=' + midnight.toUTCString() + '; path=/; SameSite=Lax';
+}
+function clearCompleted() {
+  try { localStorage.removeItem(CONFIG.DONE_KEY); } catch (e) {}
+  document.cookie = CONFIG.DONE_KEY + '=; max-age=0; path=/';
+}*/
+
+/* ============================================================
+   SURVEY FLOW
+   ============================================================ */
+const screens = ['Lang', 'Survey', 'Thanks', 'Done', 'Admin'];
+function show(name) {
+  screens.forEach(s => $('#screen' + s).classList.toggle('hidden', s !== name));
+  window.scrollTo(0, 0);
+}
+
+let lang = 'en';
+let answers = {};
+let returnTimer = null;
+
+function activeQuestions() { return QUESTIONS; }
+
+function startSurvey(l) {
+  answers = {};
+  setLang(l);
+  show('Survey');
+}
+
+function setLang(l) {
+  lang = l;
+  document.documentElement.lang = l;
+  const t = UI[l];
+  $('#surveyTitle').textContent = t.title;
+  $('#surveyIntro').textContent = t.intro;
+  $('#submitBtn').textContent = t.submit;
+  document.querySelectorAll('[data-switch]').forEach(b =>
+    b.setAttribute('aria-pressed', b.dataset.switch === l ? 'true' : 'false'));
+  renderForm();
+  hideError();
+}
+
+function renderForm() {
+  const form = $('#form');
+  form.innerHTML = '';
+  activeQuestions().forEach(q => {
+    const fs = document.createElement('fieldset');
+    fs.dataset.id = q.id;
+    const legend = document.createElement('legend');
+    legend.textContent = q.text[lang] + (q.optional ? ' ' + UI[lang].optional : '');
+    fs.appendChild(legend);
+
+    if (q.kind === 'text') {
+      const ta = document.createElement('textarea');
+      ta.name = q.id;
+      ta.maxLength = 300;
+      ta.setAttribute('aria-label', q.text[lang]);
+      ta.value = answers[q.id] || '';
+      ta.addEventListener('input', () => { answers[q.id] = ta.value; });
+      fs.appendChild(ta);
+    } else {
+      const wrap = document.createElement('div');
+      wrap.className = 'opts' + (q.wide ? ' wide' : '');
+      q.values.forEach((val, i) => {
+        const label = document.createElement('label');
+        label.className = 'opt';
+        const input = document.createElement('input');
+        input.type = 'radio';
+        input.name = q.id;
+        input.value = val;
+        input.checked = answers[q.id] === val;
+        input.addEventListener('change', () => {
+          answers[q.id] = val;
+          fs.classList.remove('error');
+          const m = fs.querySelector('.msg'); if (m) m.remove();
+        });
+        const span = document.createElement('span');
+        span.textContent = q.labels[lang][i];
+        label.append(input, span);
+        wrap.appendChild(label);
+      });
+      fs.appendChild(wrap);
+    }
+    form.appendChild(fs);
+  });
+}
+
+function hideError() { $('#formError').classList.add('hidden'); }
+
+function submitSurvey() {
+  if (hasCompleted()) { show('Done'); return; }
+  let firstBad = null;
+  activeQuestions().forEach(q => {
+    if (q.optional) return;
+    const fs = document.querySelector('fieldset[data-id="' + q.id + '"]');
+    const bad = !answers[q.id];
+    fs.classList.toggle('error', bad);
+    const old = fs.querySelector('.msg'); if (old) old.remove();
+    if (bad) {
+      const m = document.createElement('p');
+      m.className = 'msg'; m.textContent = UI[lang].pick;
+      fs.appendChild(m);
+      if (!firstBad) firstBad = fs;
+    }
+  });
+  let onlyUnder5 = false;
+  // Consistency check: a household can't have as many or more people under five
+  // than people in total (October 17 had three such responses). "more than 11" and
+  // "more than 4" are read as 12 and 5.
+  if (answers.household && answers.under5) {
+    const hh = answers.household === 'more than 11' ? 12 : parseInt(answers.household, 10);
+    const u5 = answers.under5 === 'more than 4' ? 5 : parseInt(answers.under5, 10);
+    if (u5 >= hh) {
+      if (!firstBad) onlyUnder5 = true;
+      const fs = document.querySelector('fieldset[data-id="under5"]');
+      fs.classList.add('error');
+      const old = fs.querySelector('.msg'); if (old) old.remove();
+      const m = document.createElement('p');
+      m.className = 'msg'; m.textContent = UI[lang].under5Check;
+      fs.appendChild(m);
+      if (!firstBad) firstBad = fs;
+    }
+  }
+
+  if (firstBad) {
+    const e = $('#formError');
+    e.textContent = onlyUnder5 ? UI[lang].under5Check : UI[lang].formError;
+    e.classList.remove('hidden');
+    firstBad.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    return;
+  }
+
+  const record = {
+    id: Date.now() + '-' + Math.random().toString(36).slice(2, 8),
+    date: todayString(),
+    channel: channel,
+    household: answers.household,
+    under5: answers.under5,
+    visits: answers.visits,
+    impact: answers.impact,
+    learned: (answers.learned || '').trim(),
+    language: lang === 'es' ? 'Spanish' : 'English',
+    answers: Object.assign({}, answers),
+    synced: false
+  };
+  const all = loadAll();
+  all.push(record);
+  saveAll(all);
+  markCompleted();
+  syncPending();
+
+  const t = UI[lang];
+  $('#thanksTitle').textContent = t.thanksTitle;
+  $('#thanksText').textContent = t.thanksText;
+  $('#nextBtn').textContent = t.next;
+  $('#nextBtn').classList.toggle('hidden', CONFIG.ONE_PER_DEVICE);
+  show('Thanks');
+  clearTimeout(returnTimer);
+  if (!CONFIG.ONE_PER_DEVICE) returnTimer = setTimeout(resetToStart, CONFIG.RETURN_SECONDS * 1000);
+}
+
+function resetToStart() {
+  clearTimeout(returnTimer);
+  answers = {};
+  document.documentElement.lang = 'en';
+  show('Lang');
+}
+
+/* Live sync to a Google Sheet via an Apps Script web app */
+function endpointOk() {
+  return /^https:\/\/script\.google\.com\/.+\/exec$/.test(CONFIG.SHEET_ENDPOINT);
+}
+if (CONFIG.SHEET_ENDPOINT && !endpointOk()) {
+  console.warn('SHEET_ENDPOINT must be an Apps Script web app URL ending in /exec. Responses are NOT being sent.');
+}
+let syncing = false;
+async function syncPending() {
+  if (!endpointOk() || syncing) return;
+  syncing = true;
+  const sentIds = [];
+  try {
+    for (const r of loadAll().filter(x => !x.synced)) {
+      await fetch(CONFIG.SHEET_ENDPOINT, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({ fields: sheetFields(r), header: COLUMN_HEADERS, row: recordToRow(r).map(guard) })
+      });
+      sentIds.push(r.id);
+    }
+  } catch (e) { /* offline: try again after the next submission or page load */ }
+  if (sentIds.length) {
+    saveAll(loadAll().map(r => sentIds.includes(r.id) ? Object.assign(r, { synced: true }) : r));
+  }
+  syncing = false;
+}
+
+/* ============================================================
+   STAFF EXPORT PANEL
+   ============================================================ */
+function download(filename, text) {
+  const blob = new Blob(['\ufeff' + text], { type: 'text/csv;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+function stamp() {
+  const d = new Date(), p = n => String(n).padStart(2, '0');
+  return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate());
+}
+function adminMsg(t) { $('#adminMsg').textContent = t; }
+
+function refreshAdmin() {
+  const all = loadAll();
+  $('#adminCount').textContent = all.length;
+  const pending = all.filter(r => !r.synced).length;
+  let sub = 'responses saved on this device';
+  if (!CONFIG.SHEET_ENDPOINT) {
+    sub += '. Warning: SHEET_ENDPOINT is empty, so responses are NOT being sent to Google Sheets.';
+  } else if (!endpointOk()) {
+    sub += '. Warning: SHEET_ENDPOINT is not an Apps Script web app URL (it must start with https://script.google.com/ and end in /exec), so nothing is being sent.';
+  } else {
+    sub += ' (' + pending + ' not yet sent to Google Sheets)';
+  }
+  $('#adminSub').textContent = sub;
+}
+
+function initAdmin() {
+  refreshAdmin();
+  $('#dlRows').onclick = () => {
+    const all = loadAll();
+    if (!all.length) return adminMsg('No responses to export yet.');
+    download('ccf-survey-rows-' + stamp() + '.csv', toCsv(rowsTable(all)));
+    adminMsg('Downloaded ' + all.length + ' responses (one row per household).');
+  };
+  $('#dlCols').onclick = () => {
+    const all = loadAll();
+    if (!all.length) return adminMsg('No responses to export yet.');
+    download('ccf-survey-results-layout-' + stamp() + '.csv', toCsv(colsTable(all)));
+    adminMsg('Downloaded ' + all.length + ' responses (Results-sheet layout).');
+  };
+  $('#copyRows').onclick = async () => {
+    const all = loadAll();
+    if (!all.length) return adminMsg('No responses to copy yet.');
+    const text = toTsv(rowsTable(all));
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch (e) {
+      const ta = document.createElement('textarea');
+      ta.value = text; document.body.appendChild(ta); ta.select();
+      document.execCommand('copy'); ta.remove();
+    }
+    adminMsg('Copied. Click cell A1 in Google Sheets and paste.');
+  };
+  $('#allowAgain').onclick = () => { clearCompleted(); adminMsg('This device can complete the survey again.'); };
+  $('#clearAll').onclick = () => {
+    if (confirm('Delete all saved responses on this device? This cannot be undone.')) {
+      saveAll([]); refreshAdmin(); adminMsg('All responses deleted from this device.');
+    }
+  };
+}
+
+/* ============================================================
+   START
+   ============================================================ */
+document.querySelectorAll('[data-lang]').forEach(b => b.addEventListener('click', () => startSurvey(b.dataset.lang)));
+document.querySelectorAll('[data-switch]').forEach(b => b.addEventListener('click', () => setLang(b.dataset.switch)));
+$('#submitBtn').addEventListener('click', submitSurvey);
+$('#nextBtn').addEventListener('click', resetToStart);
+
+if (params.has('admin')) {
+  initAdmin();
+  show('Admin');
+} else if (hasCompleted()) {
+  show('Done');
+  syncPending();
+} else {
+  show('Lang');
+  syncPending();
+}
+</script>
+</body>
+</html>
