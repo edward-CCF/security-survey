@@ -445,219 +445,6 @@ var COLUMN_HEADERS = [
   QUESTIONS[0].text.en,
   QUESTIONS[2].text.en,
   QUESTIONS[3].text.en,
-  'How did you first learn of our Feeding Phoenix food distributiops Script *web app* URL here (see the script below). It looks like
-  //   https://script.google.com/macros/s/AKfycb.../exec
-  // NOT the Google Sheet's own address (docs.google.com/spreadsheets/...), which cannot receive data.
-  SHEET_ENDPOINT: 'https://script.google.com/macros/s/AKfycbzpBMDpvdgVI2BycPJQW_dYMBmp2wtV40MI8Srb5cCyKcRuFwTrlVZ9NTNzsdZAvksP/exec',
-
-  // Seconds before the thank-you screen returns to language selection.
-  RETURN_SECONDS: 8,
-
-  STORAGE_KEY: 'ccf_food_security_responses_v1',
-  DONE_KEY: 'ccf_food_security_completed_v1'
-};
-
-/* Google Apps Script for SHEET_ENDPOINT. It writes each submission to the Data tab of the
-   "Security Data and Analysis" spreadsheet, matching columns by header and adding new ones.
-   Copy everything between the dashed lines into the Apps Script project, save, then
-   Deploy > Manage deployments > pencil icon > Version: New version > Deploy.
-   ------------------------------------------------------------------------------------
-// CCF Food Security Survey -> "Security Data and Analysis" spreadsheet, Data tab.
-//
-// Each submission arrives as a list of { header, aliases, value } fields.
-// Every field is matched to an existing column in row 1 of the Data tab,
-// ignoring case, spaces, line breaks and punctuation. A field whose header
-// is not found gets a new column at the right-hand end, so new survey
-// questions show up in the sheet without editing this script.
-//
-// Install: open the existing Apps Script project behind SHEET_ENDPOINT,
-// replace all of its code with this file, save, then
-// Deploy > Manage deployments > pencil icon > Version: New version > Deploy.
-// Editing the existing deployment keeps the same /exec URL.
-
-var SPREADSHEET_ID = '1QLimp-K6Q95eCaI2HPycUPdO7Buk8-FDipKdaChmlV0';
-var SHEET_NAME = 'Data';
-var HEADER_ROW = 1;
-var MAX_NEW_COLUMNS_PER_SUBMISSION = 10;  // stops a bad request from adding hundreds of columns
-var MAX_HEADER_LENGTH = 400;
-var MAX_VALUE_LENGTH = 2000;
-
-// Survey names whose sheet column has a different header. The survey can also send its own aliases.
-var HEADER_ALIASES = {
-  'Channel': ['Walk-up / Drive-through / Wednesday']
-};
-
-function doPost(e) {
-  var lock = LockService.getScriptLock();
-  lock.waitLock(30000);  // two phones submitting at once must not land on the same row
-  try {
-    var d = JSON.parse(e.postData.contents);
-    // Older versions of the survey sent { header: [...], row: [...] } instead of fields.
-    var fields = d.fields;
-    if (!fields) {
-      fields = [{ header: 'Digital or Paper', value: 'Digital' }].concat((d.header || []).map(function (h, i) {
-        return { header: h, value: (d.row || [])[i] };
-      }));
-    }
-    var sh = SpreadsheetApp.openById(SPREADSHEET_ID).getSheetByName(SHEET_NAME);
-    if (!sh) throw new Error('Tab not found: ' + SHEET_NAME);
-    writeRow_(sh, fields);
-    return ContentService.createTextOutput('ok');
-  } catch (err) {
-    console.error(err);
-    return ContentService.createTextOutput('error: ' + err.message);
-  } finally {
-    lock.releaseLock();
-  }
-}
-
-function writeRow_(sh, fields) {
-  var lastCol = Math.max(sh.getLastColumn(), 1);
-  var headers = sh.getRange(HEADER_ROW, 1, 1, lastCol).getValues()[0];
-  while (headers.length && String(headers[headers.length - 1]).trim() === '') headers.pop();
-
-  var index = {};
-  headers.forEach(function (h, i) {
-    var k = norm_(h);
-    if (k && !(k in index)) index[k] = i;
-  });
-
-  var row = [];
-  var added = 0;
-  fields.forEach(function (f) {
-    if (!f || !f.header) return;
-    var names = [f.header].concat(f.aliases || [], HEADER_ALIASES[f.header] || []);
-    var col = -1;
-    for (var j = 0; j < names.length && col < 0; j++) {
-      var k = norm_(names[j]);
-      if (k && k in index) col = index[k];
-    }
-    if (col < 0) {
-      var header = String(f.header);
-      if (!norm_(header) || header.length > MAX_HEADER_LENGTH || added >= MAX_NEW_COLUMNS_PER_SUBMISSION) return;
-      col = headers.length;
-      if (col + 1 > sh.getMaxColumns()) sh.insertColumnsAfter(sh.getMaxColumns(), 5);
-      sh.getRange(HEADER_ROW, col + 1).setValue(guard_(header));
-      headers.push(header);
-      index[norm_(header)] = col;
-      added++;
-    }
-    row[col] = cell_(f.value);
-  });
-
-  for (var c = 0; c < headers.length; c++) if (row[c] === undefined) row[c] = '';
-  var target = sh.getLastRow() + 1;
-  if (target > sh.getMaxRows()) sh.insertRowsAfter(sh.getMaxRows(), 100);
-  // Plain strings are parsed the way typing them would be: "11/3/2026" becomes a date, "2" a number.
-  sh.getRange(target, 1, 1, headers.length).setValues([row]);
-}
-
-// "Walk-up / \nDrive-through / \nWednesday" and "Walk-up / Drive-through / Wednesday" both become "walkupdrivethroughwednesday".
-function norm_(s) {
-  return String(s == null ? '' : s).toLowerCase().replace(/[^a-z0-9]+/g, '');
-}
-
-function cell_(v) {
-  if (v === null || v === undefined) return '';
-  return guard_(String(v).trim().slice(0, MAX_VALUE_LENGTH));
-}
-
-// Stop Sheets from running submitted text as a formula.
-function guard_(s) {
-  s = String(s);
-  return /^[=+\-@\t\r]/.test(s) ? "'" + s : s;
-}
-   ------------------------------------------------------------------------------------
-*/
-
-/* ============================================================
-   QUESTIONS
-   "values" are the canonical English answers written to the sheet,
-   whichever language the respondent used (matches the Results sheet).
-   ============================================================ */
-const IMPACT_EN = ['Not at all', 'A little', 'A moderate amount', 'A lot', 'A great deal'];
-const VISITS_EN = ['0', '1 or 2', '3 or 4', '5 or 6', '7 or 8', '9 or 10', '11 or 12', 'more than 12'];
-
-const QUESTIONS = [
-  {
-    id: 'household', wide: false,
-    text: { en: 'How many people are in your household?', es: '¿Cuántas personas viven en su hogar?' },
-    values: ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', 'more than 11'],
-    labels: {
-      en: ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', 'more than 11'],
-      es: ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', 'más de 11']
-    }
-  },
-  {
-    id: 'under5', wide: false,
-    text: { en: 'How many people under five years of age are in your household?', es: '¿Cuántas personas menores de cinco años viven en su hogar?' },
-    values: ['0', '1', '2', '3', '4', 'more than 4'],
-    labels: {
-      en: ['0', '1', '2', '3', '4', 'more than 4'],
-      es: ['0', '1', '2', '3', '4', 'más de 4']
-    }
-  },
-  {
-    id: 'visits', wide: false,
-    text: {
-      en: "How many times has your household received food at CCF's Feeding Phoenix food distributions in the past 3 months?",
-      es: '¿Cuántas veces ha recibido su hogar alimentos en las distribuciones de alimentos de Feeding Phoenix de CCF durante los últimos 3 meses?'
-    },
-    values: VISITS_EN,
-    labels: {
-      en: VISITS_EN,
-      es: ['0', '1 o 2', '3 o 4', '5 o 6', '7 o 8', '9 o 10', '11 o 12', 'más de 12']
-    }
-  },
-  {
-    id: 'impact', wide: true,
-    text: {
-      en: "The USDA defines food security as having consistent access to enough food. How much do CCF's Feeding Phoenix food distributions increase your household's food security?",
-      es: 'El Departamento de Agricultura de los Estados Unidos (USDA) define la seguridad alimentaria como tener acceso constante a suficientes alimentos. ¿En qué medida las distribuciones de alimentos de Feeding Phoenix de CCF aumentan la seguridad alimentaria de su hogar?'
-    },
-    values: IMPACT_EN,
-    labels: {
-      en: IMPACT_EN,
-      es: ['Nada', 'Un poco', 'Moderadamente', 'Mucho', 'En gran medida']
-    }
-  }
-];
-
-const UI = {
-  en: {
-    title: 'Food Security Survey',
-    intro: 'This information will be used to shape Creighton Community Foundation (CCF) and inform our supporters. (please select one response per question)',
-    submit: 'Submit',
-    optional: '(optional)',
-    pick: 'Please select one answer.',
-    under5Check: 'Please check: the number of people under five should be less than the number of people in your household.',
-    formError: 'Please answer the questions marked in red.',
-    thanksTitle: 'Thank you!',
-    thanksText: 'Your answers help CCF and our supporters.',
-    next: 'Start a new survey'
-  },
-  es: {
-    title: 'Encuesta de seguridad alimentaria',
-    intro: 'Esta información se utilizará para ayudar a dar forma a la Fundación Comunitaria Creighton (CCF) e informar a nuestros colaboradores. (por favor, seleccione una respuesta por pregunta)',
-    submit: 'Enviar',
-    optional: '(opcional)',
-    pick: 'Seleccione una respuesta.',
-    under5Check: 'Por favor revise: el número de personas menores de cinco años debe ser menor que el número de personas en su hogar.',
-    formError: 'Por favor responda las preguntas marcadas en rojo.',
-    thanksTitle: '¡Gracias!',
-    thanksText: 'Sus respuestas ayudan a CCF y a nuestros colaboradores.',
-    next: 'Comenzar una nueva encuesta'
-  }
-};
-
-/* Column order mirrors the Results sheet (rows 1–7). "under5" is appended last so
-   existing row references in the sheet (e.g. rows 4 and 5) don't shift. */
-const COLUMN_HEADERS = [
-  'Date',
-  'Channel',
-  QUESTIONS[0].text.en,
-  QUESTIONS[2].text.en,
-  QUESTIONS[3].text.en,
   'How did you first learn of our Feeding Phoenix food distribution?',
   'English or Spanish',
   QUESTIONS[1].text.en
@@ -665,11 +452,15 @@ const COLUMN_HEADERS = [
 
 /* ============================================================
    STORAGE (falls back to memory if the browser blocks localStorage)
-   ============================================================ */
-let memoryStore = [];
+   ============================================================
+   This script is written in older-style JavaScript (var, function) on purpose, so it also runs
+   on old iPads stuck on iOS 9 (iPad 2, iPad 3, iPad mini 1). Please don't use let, const,
+   arrow functions (=>), async/await, or other newer syntax here: one line of it stops the
+   whole survey from loading on those iPads. */
+var memoryStore = [];
 function loadAll() {
   try {
-    const raw = localStorage.getItem(CONFIG.STORAGE_KEY);
+    var raw = localStorage.getItem(CONFIG.STORAGE_KEY);
     return raw ? JSON.parse(raw) : [];
   } catch (e) { return memoryStore; }
 }
@@ -681,36 +472,58 @@ function saveAll(list) {
 /* ============================================================
    HELPERS
    ============================================================ */
-const $ = (s) => document.querySelector(s);
-const params = new URLSearchParams(location.search);
+function $(s) { return document.querySelector(s); }
+function each(list, fn) { Array.prototype.forEach.call(list, fn); }   // NodeList.forEach is missing on iOS 9
+function copyObj(o) { var c = {}; for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) c[k] = o[k]; return c; }
+function removeEl(el) { if (el && el.parentNode) el.parentNode.removeChild(el); }
+
+// Reads ?ch=...&kiosk=... from the address (URLSearchParams is missing on iOS 9).
+var params = (function (search) {
+  var out = {};
+  String(search || '').replace(/^\?/, '').split('&').forEach(function (pair) {
+    if (!pair) return;
+    var i = pair.indexOf('=');
+    var k = i < 0 ? pair : pair.slice(0, i);
+    var v = i < 0 ? '' : pair.slice(i + 1);
+    try { k = decodeURIComponent(k.replace(/\+/g, ' ')); v = decodeURIComponent(v.replace(/\+/g, ' ')); } catch (e) {}
+    if (!Object.prototype.hasOwnProperty.call(out, k)) out[k] = v;
+  });
+  return out;
+})(location.search);
+function param(name) { return Object.prototype.hasOwnProperty.call(params, name) ? params[name] : null; }
+
 // Short QR tags (and the full names) map to the exact labels used in the Data tab.
 // Anything else falls back to CONFIG.CHANNEL, so a typo can't create a new category.
-const CHANNELS = {
+var CHANNELS = {
   'dt': 'Drive-through', 'drive-through': 'Drive-through', 'drivethrough': 'Drive-through',
   'wu': 'Walk-up', 'walk-up': 'Walk-up', 'walkup': 'Walk-up',
   'wed': 'Wednesday', 'wednesday': 'Wednesday'
 };
-const channelTag = (params.get('ch') || params.get('channel') || '').trim().toLowerCase();
-const channel = CHANNELS[channelTag] || CONFIG.CHANNEL;
+var channelTag = (param('ch') || param('channel') || '').trim().toLowerCase();
+var channel = CHANNELS[channelTag] || CONFIG.CHANNEL;
 
 // Kiosk mode for shared tablets: ?kiosk=1 (also accepts true/yes).
-if (['1', 'true', 'yes'].includes((params.get('kiosk') || '').trim().toLowerCase())) CONFIG.ONE_PER_DEVICE = false;
+if (['1', 'true', 'yes'].indexOf((param('kiosk') || '').trim().toLowerCase()) >= 0) CONFIG.ONE_PER_DEVICE = false;
 
 function todayString() {
-  const d = new Date();
+  var d = new Date();
   return (d.getMonth() + 1) + '/' + d.getDate() + '/' + d.getFullYear();
 }
 function guard(v) {               // stop Google Sheets from running typed text as a formula
-  const s = String(v == null ? '' : v);
+  var s = String(v == null ? '' : v);
   return /^[=+\-@\t\r]/.test(s) ? ' ' + s : s;
 }
 function csvCell(v) {
-  const s = guard(v);
+  var s = guard(v);
   return /[",\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
 }
-function toCsv(table) { return table.map(r => r.map(csvCell).join(',')).join('\r\n'); }
+function toCsv(table) {
+  return table.map(function (r) { return r.map(csvCell).join(','); }).join('\r\n');
+}
 function toTsv(table) {
-  return table.map(r => r.map(v => guard(v).replace(/[\t\r\n]+/g, ' ')).join('\t')).join('\n');
+  return table.map(function (r) {
+    return r.map(function (v) { return guard(v).replace(/[\t\r\n]+/g, ' '); }).join('\t');
+  }).join('\n');
 }
 function recordToRow(r) {
   return [r.date, r.channel, r.household, r.visits, r.impact, r.learned, r.language, r.under5];
@@ -718,8 +531,9 @@ function recordToRow(r) {
 function rowsTable(list) { return [COLUMN_HEADERS].concat(list.map(recordToRow)); }
 function colsTable(list) {
   // One column per household; labels in A, blank B, answers from C (same as the Results sheet)
-  return COLUMN_HEADERS.map((h, i) =>
-    [i < 2 ? '' : h, ''].concat(list.map(r => recordToRow(r)[i])));
+  return COLUMN_HEADERS.map(function (h, i) {
+    return [i < 2 ? '' : h, ''].concat(list.map(function (r) { return recordToRow(r)[i]; }));
+  });
 }
 
 /* What gets sent to the sheet, one entry per column. The Apps Script matches each header
@@ -728,35 +542,36 @@ function colsTable(list) {
    QUESTIONS is included automatically under its English text. If you reword a question and
    want its answers to stay in the same column, add the old wording to that question as
    sheetAliases: ['old wording'], or rename the column header in the sheet to match. */
-const SHEET_FIELDS = [
-  { header: 'Digital or Paper', value: r => 'Digital' },
-  { header: 'Date', value: r => r.date },
-  { header: 'Channel', aliases: ['Walk-up / Drive-through / Wednesday'], value: r => r.channel },
-  { header: 'English or Spanish', value: r => r.language }
+var SHEET_FIELDS = [
+  { header: 'Digital or Paper', value: function (r) { return 'Digital'; } },
+  { header: 'Date', value: function (r) { return r.date; } },
+  { header: 'Channel', aliases: ['Walk-up / Drive-through / Wednesday'], value: function (r) { return r.channel; } },
+  { header: 'English or Spanish', value: function (r) { return r.language; } }
 ];
 function sheetFields(r) {
-  const a = r.answers || r;  // records saved before this change keep answers at the top level
-  return SHEET_FIELDS.map(f => ({ header: f.header, aliases: f.aliases || [], value: guard(f.value(r)) }))
-    .concat(activeQuestions().map(q => ({
-      header: q.text.en,
-      aliases: q.sheetAliases || [],
-      value: guard(a[q.id] == null ? '' : a[q.id])
-    })));
+  var a = r.answers || r;  // records saved before this change keep answers at the top level
+  return SHEET_FIELDS.map(function (f) {
+    return { header: f.header, aliases: f.aliases || [], value: guard(f.value(r)) };
+  }).concat(activeQuestions().map(function (q) {
+    return { header: q.text.en, aliases: q.sheetAliases || [], value: guard(a[q.id] == null ? '' : a[q.id]) };
+  }));
 }
 
 /* One completion per device (browser). This is a soft limit: clearing browser data,
    private mode, or another browser/device can get around it.*/
 function hasCompleted() {
   if (!CONFIG.ONE_PER_DEVICE) return false;
-  const today = todayString();
+  var today = todayString();
   try { if (localStorage.getItem(CONFIG.DONE_KEY) === today) return true; } catch (e) {}
-  return document.cookie.split('; ').some(c => c === CONFIG.DONE_KEY + '=' + encodeURIComponent(today));
+  return document.cookie.split('; ').some(function (c) {
+    return c === CONFIG.DONE_KEY + '=' + encodeURIComponent(today);
+  });
 }
 function markCompleted() {
-  const today = todayString();
+  var today = todayString();
   try { localStorage.setItem(CONFIG.DONE_KEY, today); } catch (e) {}
   // Cookie expires at the next local midnight, so the block resets daily.
-  const midnight = new Date(); midnight.setHours(24, 0, 0, 0);
+  var midnight = new Date(); midnight.setHours(24, 0, 0, 0);
   document.cookie = CONFIG.DONE_KEY + '=' + encodeURIComponent(today) +
     '; expires=' + midnight.toUTCString() + '; path=/; SameSite=Lax';
 }
@@ -768,15 +583,15 @@ function clearCompleted() {
 /* ============================================================
    SURVEY FLOW
    ============================================================ */
-const screens = ['Lang', 'Survey', 'Thanks', 'Done', 'Admin'];
+var screens = ['Lang', 'Survey', 'Thanks', 'Done', 'Admin'];
 function show(name) {
-  screens.forEach(s => $('#screen' + s).classList.toggle('hidden', s !== name));
+  screens.forEach(function (s) { $('#screen' + s).classList.toggle('hidden', s !== name); });
   window.scrollTo(0, 0);
 }
 
-let lang = 'en';
-let answers = {};
-let returnTimer = null;
+var lang = 'en';
+var answers = {};
+var returnTimer = null;
 
 function activeQuestions() { return QUESTIONS; }
 
@@ -789,53 +604,55 @@ function startSurvey(l) {
 function setLang(l) {
   lang = l;
   document.documentElement.lang = l;
-  const t = UI[l];
+  var t = UI[l];
   $('#surveyTitle').textContent = t.title;
   $('#surveyIntro').textContent = t.intro;
   $('#submitBtn').textContent = t.submit;
-  document.querySelectorAll('[data-switch]').forEach(b =>
-    b.setAttribute('aria-pressed', b.dataset.switch === l ? 'true' : 'false'));
+  each(document.querySelectorAll('[data-switch]'), function (b) {
+    b.setAttribute('aria-pressed', b.getAttribute('data-switch') === l ? 'true' : 'false');
+  });
   renderForm();
   hideError();
 }
 
 function renderForm() {
-  const form = $('#form');
+  var form = $('#form');
   form.innerHTML = '';
-  activeQuestions().forEach(q => {
-    const fs = document.createElement('fieldset');
-    fs.dataset.id = q.id;
-    const legend = document.createElement('legend');
+  activeQuestions().forEach(function (q) {
+    var fs = document.createElement('fieldset');
+    fs.setAttribute('data-id', q.id);
+    var legend = document.createElement('legend');
     legend.textContent = q.text[lang] + (q.optional ? ' ' + UI[lang].optional : '');
     fs.appendChild(legend);
 
     if (q.kind === 'text') {
-      const ta = document.createElement('textarea');
+      var ta = document.createElement('textarea');
       ta.name = q.id;
       ta.maxLength = 300;
       ta.setAttribute('aria-label', q.text[lang]);
       ta.value = answers[q.id] || '';
-      ta.addEventListener('input', () => { answers[q.id] = ta.value; });
+      ta.addEventListener('input', function () { answers[q.id] = ta.value; });
       fs.appendChild(ta);
     } else {
-      const wrap = document.createElement('div');
+      var wrap = document.createElement('div');
       wrap.className = 'opts' + (q.wide ? ' wide' : '');
-      q.values.forEach((val, i) => {
-        const label = document.createElement('label');
+      q.values.forEach(function (val, i) {
+        var label = document.createElement('label');
         label.className = 'opt';
-        const input = document.createElement('input');
+        var input = document.createElement('input');
         input.type = 'radio';
         input.name = q.id;
         input.value = val;
         input.checked = answers[q.id] === val;
-        input.addEventListener('change', () => {
+        input.addEventListener('change', function () {
           answers[q.id] = val;
           fs.classList.remove('error');
-          const m = fs.querySelector('.msg'); if (m) m.remove();
+          removeEl(fs.querySelector('.msg'));
         });
-        const span = document.createElement('span');
+        var span = document.createElement('span');
         span.textContent = q.labels[lang][i];
-        label.append(input, span);
+        label.appendChild(input);
+        label.appendChild(span);
         wrap.appendChild(label);
       });
       fs.appendChild(wrap);
@@ -848,48 +665,48 @@ function hideError() { $('#formError').classList.add('hidden'); }
 
 function submitSurvey() {
   if (hasCompleted()) { show('Done'); return; }
-  let firstBad = null;
-  activeQuestions().forEach(q => {
+  var firstBad = null;
+  activeQuestions().forEach(function (q) {
     if (q.optional) return;
-    const fs = document.querySelector('fieldset[data-id="' + q.id + '"]');
-    const bad = !answers[q.id];
+    var fs = document.querySelector('fieldset[data-id="' + q.id + '"]');
+    var bad = !answers[q.id];
     fs.classList.toggle('error', bad);
-    const old = fs.querySelector('.msg'); if (old) old.remove();
+    removeEl(fs.querySelector('.msg'));
     if (bad) {
-      const m = document.createElement('p');
+      var m = document.createElement('p');
       m.className = 'msg'; m.textContent = UI[lang].pick;
       fs.appendChild(m);
       if (!firstBad) firstBad = fs;
     }
   });
-  let onlyUnder5 = false;
+  var onlyUnder5 = false;
   // Consistency check: a household can't have as many or more people under five
   // than people in total (October 17 had three such responses). "more than 11" and
   // "more than 4" are read as 12 and 5.
   if (answers.household && answers.under5) {
-    const hh = answers.household === 'more than 11' ? 12 : parseInt(answers.household, 10);
-    const u5 = answers.under5 === 'more than 4' ? 5 : parseInt(answers.under5, 10);
+    var hh = answers.household === 'more than 11' ? 12 : parseInt(answers.household, 10);
+    var u5 = answers.under5 === 'more than 4' ? 5 : parseInt(answers.under5, 10);
     if (u5 >= hh) {
       if (!firstBad) onlyUnder5 = true;
-      const fs = document.querySelector('fieldset[data-id="under5"]');
-      fs.classList.add('error');
-      const old = fs.querySelector('.msg'); if (old) old.remove();
-      const m = document.createElement('p');
-      m.className = 'msg'; m.textContent = UI[lang].under5Check;
-      fs.appendChild(m);
-      if (!firstBad) firstBad = fs;
+      var fs5 = document.querySelector('fieldset[data-id="under5"]');
+      fs5.classList.add('error');
+      removeEl(fs5.querySelector('.msg'));
+      var m5 = document.createElement('p');
+      m5.className = 'msg'; m5.textContent = UI[lang].under5Check;
+      fs5.appendChild(m5);
+      if (!firstBad) firstBad = fs5;
     }
   }
 
   if (firstBad) {
-    const e = $('#formError');
+    var e = $('#formError');
     e.textContent = onlyUnder5 ? UI[lang].under5Check : UI[lang].formError;
     e.classList.remove('hidden');
     firstBad.scrollIntoView({ behavior: 'smooth', block: 'center' });
     return;
   }
 
-  const record = {
+  var record = {
     id: Date.now() + '-' + Math.random().toString(36).slice(2, 8),
     date: todayString(),
     channel: channel,
@@ -899,16 +716,16 @@ function submitSurvey() {
     impact: answers.impact,
     learned: (answers.learned || '').trim(),
     language: lang === 'es' ? 'Spanish' : 'English',
-    answers: Object.assign({}, answers),
+    answers: copyObj(answers),
     synced: false
   };
-  const all = loadAll();
+  var all = loadAll();
   all.push(record);
   saveAll(all);
   markCompleted();
   syncPending();
 
-  const t = UI[lang];
+  var t = UI[lang];
   $('#thanksTitle').textContent = t.thanksTitle;
   $('#thanksText').textContent = t.thanksText;
   $('#nextBtn').textContent = t.next;
@@ -932,52 +749,80 @@ function endpointOk() {
 if (CONFIG.SHEET_ENDPOINT && !endpointOk()) {
   console.warn('SHEET_ENDPOINT must be an Apps Script web app URL ending in /exec. Responses are NOT being sent.');
 }
-let syncing = false;
-async function syncPending() {
+
+// Sends one response; calls done(true) once it has gone out, done(false) if it couldn't be sent.
+function postRecord(r, done) {
+  var body = JSON.stringify({ fields: sheetFields(r), header: COLUMN_HEADERS, row: recordToRow(r).map(guard) });
+  if (window.fetch) {
+    fetch(CONFIG.SHEET_ENDPOINT, {
+      method: 'POST',
+      mode: 'no-cors',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: body
+    }).then(function () { done(true); }, function () { done(false); });
+    return;
+  }
+  // iOS 9 Safari has no fetch(); a plain-text XMLHttpRequest POST does the same job.
+  var x = new XMLHttpRequest();
+  x.open('POST', CONFIG.SHEET_ENDPOINT, true);
+  x.setRequestHeader('Content-Type', 'text/plain;charset=utf-8');
+  x.timeout = 30000;
+  x.onload = function () { done(true); };
+  x.onerror = x.ontimeout = function () { done(false); };
+  try { x.send(body); } catch (e) { done(false); }
+}
+
+var syncing = false;
+function syncPending() {
   if (!endpointOk() || syncing) return;
   syncing = true;
-  const sentIds = [];
-  try {
-    for (const r of loadAll().filter(x => !x.synced)) {
-      await fetch(CONFIG.SHEET_ENDPOINT, {
-        method: 'POST',
-        mode: 'no-cors',
-        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-        body: JSON.stringify({ fields: sheetFields(r), header: COLUMN_HEADERS, row: recordToRow(r).map(guard) })
-      });
-      sentIds.push(r.id);
+  var queue = loadAll().filter(function (x) { return !x.synced; });
+  var sentIds = [];
+  function finish() {
+    if (sentIds.length) {
+      saveAll(loadAll().map(function (r) {
+        if (sentIds.indexOf(r.id) >= 0) r.synced = true;
+        return r;
+      }));
     }
-  } catch (e) { /* offline: try again after the next submission or page load */ }
-  if (sentIds.length) {
-    saveAll(loadAll().map(r => sentIds.includes(r.id) ? Object.assign(r, { synced: true }) : r));
+    syncing = false;
   }
-  syncing = false;
+  function next(i) {
+    if (i >= queue.length) { finish(); return; }
+    postRecord(queue[i], function (ok) {
+      if (!ok) { finish(); return; }  // offline: try again after the next submission or page load
+      sentIds.push(queue[i].id);
+      next(i + 1);
+    });
+  }
+  next(0);
 }
 
 /* ============================================================
    STAFF EXPORT PANEL
    ============================================================ */
 function download(filename, text) {
-  const blob = new Blob(['\ufeff' + text], { type: 'text/csv;charset=utf-8' });
-  const a = document.createElement('a');
+  var blob = new Blob(['﻿' + text], { type: 'text/csv;charset=utf-8' });
+  var a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
   a.download = filename;
   document.body.appendChild(a);
   a.click();
-  a.remove();
-  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  removeEl(a);
+  setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
 }
 function stamp() {
-  const d = new Date(), p = n => String(n).padStart(2, '0');
+  var d = new Date();
+  function p(n) { return (n < 10 ? '0' : '') + n; }
   return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate());
 }
 function adminMsg(t) { $('#adminMsg').textContent = t; }
 
 function refreshAdmin() {
-  const all = loadAll();
+  var all = loadAll();
   $('#adminCount').textContent = all.length;
-  const pending = all.filter(r => !r.synced).length;
-  let sub = 'responses saved on this device';
+  var pending = all.filter(function (r) { return !r.synced; }).length;
+  var sub = 'responses saved on this device';
   if (!CONFIG.SHEET_ENDPOINT) {
     sub += '. Warning: SHEET_ENDPOINT is empty, so responses are NOT being sent to Google Sheets.';
   } else if (!endpointOk()) {
@@ -990,33 +835,38 @@ function refreshAdmin() {
 
 function initAdmin() {
   refreshAdmin();
-  $('#dlRows').onclick = () => {
-    const all = loadAll();
+  $('#dlRows').onclick = function () {
+    var all = loadAll();
     if (!all.length) return adminMsg('No responses to export yet.');
     download('ccf-survey-rows-' + stamp() + '.csv', toCsv(rowsTable(all)));
     adminMsg('Downloaded ' + all.length + ' responses (one row per household).');
   };
-  $('#dlCols').onclick = () => {
-    const all = loadAll();
+  $('#dlCols').onclick = function () {
+    var all = loadAll();
     if (!all.length) return adminMsg('No responses to export yet.');
     download('ccf-survey-results-layout-' + stamp() + '.csv', toCsv(colsTable(all)));
     adminMsg('Downloaded ' + all.length + ' responses (Results-sheet layout).');
   };
-  $('#copyRows').onclick = async () => {
-    const all = loadAll();
+  $('#copyRows').onclick = function () {
+    var all = loadAll();
     if (!all.length) return adminMsg('No responses to copy yet.');
-    const text = toTsv(rowsTable(all));
-    try {
-      await navigator.clipboard.writeText(text);
-    } catch (e) {
-      const ta = document.createElement('textarea');
+    var text = toTsv(rowsTable(all));
+    function copied() { adminMsg('Copied. Click cell A1 in Google Sheets and paste.'); }
+    function fallback() {
+      var ta = document.createElement('textarea');
       ta.value = text; document.body.appendChild(ta); ta.select();
-      document.execCommand('copy'); ta.remove();
+      try { document.execCommand('copy'); } catch (e) {}
+      removeEl(ta);
+      copied();
     }
-    adminMsg('Copied. Click cell A1 in Google Sheets and paste.');
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(copied, fallback);
+    } else {
+      fallback();
+    }
   };
-  $('#allowAgain').onclick = () => { clearCompleted(); adminMsg('This device can complete the survey again.'); };
-  $('#clearAll').onclick = () => {
+  $('#allowAgain').onclick = function () { clearCompleted(); adminMsg('This device can complete the survey again.'); };
+  $('#clearAll').onclick = function () {
     if (confirm('Delete all saved responses on this device? This cannot be undone.')) {
       saveAll([]); refreshAdmin(); adminMsg('All responses deleted from this device.');
     }
@@ -1026,12 +876,16 @@ function initAdmin() {
 /* ============================================================
    START
    ============================================================ */
-document.querySelectorAll('[data-lang]').forEach(b => b.addEventListener('click', () => startSurvey(b.dataset.lang)));
-document.querySelectorAll('[data-switch]').forEach(b => b.addEventListener('click', () => setLang(b.dataset.switch)));
+each(document.querySelectorAll('[data-lang]'), function (b) {
+  b.addEventListener('click', function () { startSurvey(b.getAttribute('data-lang')); });
+});
+each(document.querySelectorAll('[data-switch]'), function (b) {
+  b.addEventListener('click', function () { setLang(b.getAttribute('data-switch')); });
+});
 $('#submitBtn').addEventListener('click', submitSurvey);
 $('#nextBtn').addEventListener('click', resetToStart);
 
-if (params.has('admin')) {
+if (param('admin') !== null) {
   initAdmin();
   show('Admin');
 } else if (hasCompleted()) {
