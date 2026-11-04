@@ -203,11 +203,14 @@ window.addEventListener('error', function (e) {
    SETTINGS
    ============================================================ */
 const CONFIG = {
-  // Written to the "Channel" row/column. Override per device with ?channel=Drive-through
-  CHANNEL: 'Drive-through',
+  // Written to the "Channel" column when the link has no valid ?ch= tag (e.g. a bare link someone shared).
+  // Each QR code carries its own tag: ?ch=dt (Drive-through), ?ch=wu (Walk-up), ?ch=wed (Wednesday).
+  CHANNEL: 'blank / unknown',
 
   // true: each phone/browser can submit once per day (resets at midnight), then sees an "already completed" message.
-  // Set to false for a shared tablet where many people take turns (adds a "new survey" button).
+  // A shared tablet where many people take turns opens the link with ?kiosk=1, which turns this off
+  // (adds a "new survey" button and returns to the start after each response). Combine tags with &:
+  //   security_survey.html?ch=wed&kiosk=1
   ONE_PER_DEVICE: true,
 
   // Paste the Apps Script *web app* URL here (see the script below). It looks like
@@ -448,7 +451,18 @@ function saveAll(list) {
    ============================================================ */
 const $ = (s) => document.querySelector(s);
 const params = new URLSearchParams(location.search);
-const channel = params.get('channel') || CONFIG.CHANNEL;
+// Short QR tags (and the full names) map to the exact labels used in the Data tab.
+// Anything else falls back to CONFIG.CHANNEL, so a typo can't create a new category.
+const CHANNELS = {
+  'dt': 'Drive-through', 'drive-through': 'Drive-through', 'drivethrough': 'Drive-through',
+  'wu': 'Walk-up', 'walk-up': 'Walk-up', 'walkup': 'Walk-up',
+  'wed': 'Wednesday', 'wednesday': 'Wednesday'
+};
+const channelTag = (params.get('ch') || params.get('channel') || '').trim().toLowerCase();
+const channel = CHANNELS[channelTag] || CONFIG.CHANNEL;
+
+// Kiosk mode for shared tablets: ?kiosk=1 (also accepts true/yes).
+if (['1', 'true', 'yes'].includes((params.get('kiosk') || '').trim().toLowerCase())) CONFIG.ONE_PER_DEVICE = false;
 
 function todayString() {
   const d = new Date();
