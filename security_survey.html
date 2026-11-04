@@ -499,7 +499,7 @@ function sheetFields(r) {
 }
 
 /* One completion per device (browser). This is a soft limit: clearing browser data,
-   private mode, or another browser/device can get around it. */
+   private mode, or another browser/device can get around it.
 function hasCompleted() {
   if (!CONFIG.ONE_PER_DEVICE) return false;
   const today = todayString();
@@ -517,7 +517,7 @@ function markCompleted() {
 function clearCompleted() {
   try { localStorage.removeItem(CONFIG.DONE_KEY); } catch (e) {}
   document.cookie = CONFIG.DONE_KEY + '=; max-age=0; path=/';
-}
+}*/
 
 /* ============================================================
    SURVEY FLOW
