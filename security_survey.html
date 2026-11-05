@@ -257,6 +257,13 @@ var CONFIG = {
 // is not found gets a new column at the right-hand end, so new survey
 // questions show up in the sheet without editing this script.
 //
+// Every response carries a "Response ID". A response whose ID is already in
+// the Data tab is skipped, so a phone or tablet that sends the same response
+// twice (for example after a dropped connection) can't create duplicate rows.
+//
+// The survey sends either a plain-text POST body (phones) or a form field
+// named "payload" (old iPads); both hold the same JSON.
+//
 // Install: open the existing Apps Script project behind SHEET_ENDPOINT,
 // replace all of its code with this file, save, then
 // Deploy > Manage deployments > pencil icon > Version: New version > Deploy.
@@ -265,9 +272,10 @@ var CONFIG = {
 var SPREADSHEET_ID = '1QLimp-K6Q95eCaI2HPycUPdO7Buk8-FDipKdaChmlV0';
 var SHEET_NAME = 'Data';
 var HEADER_ROW = 1;
-var MAX_NEW_COLUMNS_PER_SUBMISSION = 10;  // stops a bad request from adding hundreds of columns
+var MAX_NEW_COLUMNS_PER_SUBMISSION = 10; // stops a bad request from adding hundreds of columns
 var MAX_HEADER_LENGTH = 400;
 var MAX_VALUE_LENGTH = 2000;
+var ID_HEADER = 'Response ID';
 
 // Survey names whose sheet column has a different header. The survey can also send its own aliases.
 var HEADER_ALIASES = {
@@ -276,9 +284,10 @@ var HEADER_ALIASES = {
 
 function doPost(e) {
   var lock = LockService.getScriptLock();
-  lock.waitLock(30000);  // two phones submitting at once must not land on the same row
+  lock.waitLock(30000); // two phones submitting at once must not land on the same row
   try {
-    var d = JSON.parse(e.postData.contents);
+    var raw = (e.parameter && e.parameter.payload) || (e.postData && e.postData.contents);
+    var d = JSON.parse(raw);
     // Older versions of the survey sent { header: [...], row: [...] } instead of fields.
     var fields = d.fields;
     if (!fields) {
@@ -288,8 +297,8 @@ function doPost(e) {
     }
     var sh = SpreadsheetApp.openById(SPREADSHEET_ID).getSheetByName(SHEET_NAME);
     if (!sh) throw new Error('Tab not found: ' + SHEET_NAME);
-    writeRow_(sh, fields);
-    return ContentService.createTextOutput('ok');
+    var written = writeRow_(sh, fields);
+    return ContentService.createTextOutput(written ? 'ok' : 'duplicate');
   } catch (err) {
     console.error(err);
     return ContentService.createTextOutput('error: ' + err.message);
@@ -298,6 +307,7 @@ function doPost(e) {
   }
 }
 
+// Returns false (and writes nothing) when the response's ID is already in the sheet.
 function writeRow_(sh, fields) {
   var lastCol = Math.max(sh.getLastColumn(), 1);
   var headers = sh.getRange(HEADER_ROW, 1, 1, lastCol).getValues()[0];
@@ -308,6 +318,12 @@ function writeRow_(sh, fields) {
     var k = norm_(h);
     if (k && !(k in index)) index[k] = i;
   });
+
+  var id = '';
+  fields.forEach(function (f) {
+    if (f && norm_(f.header) === norm_(ID_HEADER)) id = String(f.value == null ? '' : f.value).trim();
+  });
+  if (id && alreadyWritten_(sh, index, id)) return false;
 
   var row = [];
   var added = 0;
@@ -337,6 +353,16 @@ function writeRow_(sh, fields) {
   if (target > sh.getMaxRows()) sh.insertRowsAfter(sh.getMaxRows(), 100);
   // Plain strings are parsed the way typing them would be: "11/3/2026" becomes a date, "2" a number.
   sh.getRange(target, 1, 1, headers.length).setValues([row]);
+  return true;
+}
+
+// True if the Response ID column already holds this exact ID.
+function alreadyWritten_(sh, index, id) {
+  var col = index[norm_(ID_HEADER)];
+  var last = sh.getLastRow();
+  if (col === undefined || last <= HEADER_ROW) return false;
+  return !!sh.getRange(HEADER_ROW + 1, col + 1, last - HEADER_ROW, 1)
+    .createTextFinder(id).matchEntireCell(true).findNext();
 }
 
 // "Walk-up / \nDrive-through / \nWednesday" and "Walk-up / Drive-through / Wednesday" both become "walkupdrivethroughwednesday".
@@ -458,7 +484,11 @@ var COLUMN_HEADERS = [
    arrow functions (=>), async/await, or other newer syntax here: one line of it stops the
    whole survey from loading on those iPads. */
 var memoryStore = [];
+var storageWorks = true; // false once saving fails (e.g. Safari private browsing on old iPads)
 function loadAll() {
+  // When saving fails, reading can still "work" and return nothing, which would hide
+  // responses kept in memory from syncPending(); use the memory copy instead.
+  if (!storageWorks) return memoryStore;
   try {
     var raw = localStorage.getItem(CONFIG.STORAGE_KEY);
     return raw ? JSON.parse(raw) : [];
@@ -466,7 +496,10 @@ function loadAll() {
 }
 function saveAll(list) {
   memoryStore = list;
-  try { localStorage.setItem(CONFIG.STORAGE_KEY, JSON.stringify(list)); } catch (e) { /* memory only */ }
+  try {
+    localStorage.setItem(CONFIG.STORAGE_KEY, JSON.stringify(list));
+    storageWorks = true;
+  } catch (e) { storageWorks = false; /* memory only */ }
 }
 
 /* ============================================================
@@ -546,7 +579,9 @@ var SHEET_FIELDS = [
   { header: 'Digital or Paper', value: function (r) { return 'Digital'; } },
   { header: 'Date', value: function (r) { return r.date; } },
   { header: 'Channel', aliases: ['Walk-up / Drive-through / Wednesday'], value: function (r) { return r.channel; } },
-  { header: 'English or Spanish', value: function (r) { return r.language; } }
+  { header: 'English or Spanish', value: function (r) { return r.language; } },
+  // Lets the Apps Script skip a response it has already written, so sending one twice is harmless.
+  { header: 'Response ID', value: function (r) { return r.id; } }
 ];
 function sheetFields(r) {
   var a = r.answers || r;  // records saved before this change keep answers at the top level
@@ -762,14 +797,55 @@ function postRecord(r, done) {
     }).then(function () { done(true); }, function () { done(false); });
     return;
   }
-  // iOS 9 Safari has no fetch(); a plain-text XMLHttpRequest POST does the same job.
-  var x = new XMLHttpRequest();
-  x.open('POST', CONFIG.SHEET_ENDPOINT, true);
-  x.setRequestHeader('Content-Type', 'text/plain;charset=utf-8');
-  x.timeout = 30000;
-  x.onload = function () { done(true); };
-  x.onerror = x.ontimeout = function () { done(false); };
-  try { x.send(body); } catch (e) { done(false); }
+  // iOS 9 Safari has no fetch(), and its XMLHttpRequest can't be used: Apps Script answers every
+  // POST with a redirect to another Google address, which that Safari reports as an error even
+  // though the row was already written. The response then stayed "not sent" and went out again
+  // with every later submission, while the responses queued behind it never went out
+  // (November 4: one person's answers written 11 times). A form posted into a hidden frame
+  // follows the redirect normally.
+  postViaForm(body, done);
+}
+
+var formPosts = 0;
+function postViaForm(body, done) {
+  if (navigator.onLine === false) { done(false); return; }
+  var name = 'sheetPost' + (++formPosts);
+  var frame = document.createElement('iframe');
+  frame.name = name;
+  frame.style.display = 'none';
+  document.body.appendChild(frame);
+  var form = document.createElement('form');
+  form.method = 'POST';
+  form.action = CONFIG.SHEET_ENDPOINT;
+  form.target = name;
+  form.style.display = 'none';
+  var input = document.createElement('input');
+  input.type = 'hidden';
+  input.name = 'payload';
+  input.value = body;
+  form.appendChild(input);
+  document.body.appendChild(form);
+
+  var finished = false;
+  var timer = setTimeout(function () { end(false); }, 30000);
+  function end(ok) {
+    if (finished) return;
+    finished = true;
+    clearTimeout(timer);
+    setTimeout(function () { removeEl(form); removeEl(frame); }, 0);
+    done(ok);
+  }
+  // Wait a moment so the frame's own blank page loading isn't taken for the reply.
+  setTimeout(function () {
+    frame.onload = function () {
+      // After a successful post the frame holds a Google page this page can't read. If the
+      // frame is still readable and blank, the post never got anywhere (no connection).
+      var href = null;
+      try { href = frame.contentWindow.location.href; } catch (e) { href = null; }
+      end(!(typeof href === 'string' && href.indexOf('about:') === 0));
+    };
+    try { form.submit(); } catch (e) { end(false); }
+  }, 0);
 }
 
 var syncing = false;
