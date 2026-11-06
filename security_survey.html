@@ -388,7 +388,9 @@ function guard_(s) {
    "values" are the canonical English answers written to the sheet,
    whichever language the respondent used (matches the Results sheet).
    ============================================================ */
-var IMPACT_EN = ['Not at all', 'A little', 'A moderate amount', 'A lot', 'A great deal'];
+// "Don't know / uncertain" added Nov 6, 2026 to match the paper survey. It is not a
+// positive or negative answer, so leave it out of the "positive impact" share.
+var IMPACT_EN = ["Don't know / uncertain", 'Not at all', 'A little', 'A moderate amount', 'A lot', 'A great deal'];
 var VISITS_EN = ['0', '1 or 2', '3 or 4', '5 or 6', '7 or 8', '9 or 10', '11 or 12', 'more than 12'];
 
 var QUESTIONS = [
@@ -430,8 +432,8 @@ var QUESTIONS = [
     },
     values: IMPACT_EN,
     labels: {
-      en: IMPACT_EN,
-      es: ['Nada', 'Un poco', 'Moderadamente', 'Mucho', 'En gran medida']
+      en: ['Don’t know / uncertain', 'Not at all', 'A little', 'A moderate amount', 'A lot', 'A great deal'],
+      es: ['No sé / No estoy seguro(a)', 'Nada', 'Un poco', 'Moderadamente', 'Mucho', 'En gran medida']
     }
   }
 ];
